@@ -34,6 +34,7 @@ const SHEETS_WEBHOOK_URL = String(process.env.SHEETS_WEBHOOK_URL || "").trim();
 const FIELD_ORDER = [
   ["receivedAt", "Timestamp"],
   ["id", "ID"],
+  ["clave", "Clave YAAVSER"],
   ["experiencia", "Experiencia general"],
   ["satisfaccion", "Satisfacción"],
   ["gusto", "Lo que más gustó"],

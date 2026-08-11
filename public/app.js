@@ -6,6 +6,14 @@
   const STEPS = [
     { id: "welcome", type: "welcome" },
     {
+      id: "clave",
+      type: "input",
+      title: "¿Cuál es tu clave YAAVSER?",
+      placeholder: "Escribe tu clave YAAVSER",
+      hint: "Con ella identificamos quién contestó la encuesta.",
+      required: true,
+    },
+    {
       id: "experiencia",
       type: "stars",
       title: "¿Cómo calificarías tu experiencia general con la activación?",
@@ -126,7 +134,7 @@
   function canContinue() {
     const step = STEPS[state.step];
     if (!step || step.type === "welcome") return true;
-    if (step.type === "text") {
+    if (step.type === "text" || step.type === "input") {
       if (!step.required) return true;
       return String(state.answers[step.id] || "").trim().length > 0;
     }
@@ -295,13 +303,24 @@
   }
 
   function renderText(step) {
+    const isInput = step.type === "input";
     return `
       <div class="field">
-        <label for="text-${step.id}">${step.required ? "Respuesta" : "Opcional"}</label>
-        <textarea id="text-${step.id}" data-text="${step.id}"
-          placeholder="${escapeHtml(step.placeholder || "")}">${escapeHtml(
-      state.answers[step.id] || ""
-    )}</textarea>
+        <label for="text-${step.id}">${
+          step.required ? (isInput ? "Clave YAAVSER" : "Respuesta") : "Opcional"
+        }</label>
+        ${
+          isInput
+            ? `<input id="text-${step.id}" data-text="${step.id}" type="text"
+                inputmode="text" autocomplete="off" spellcheck="false"
+                value="${escapeHtml(state.answers[step.id] || "")}"
+                placeholder="${escapeHtml(step.placeholder || "")}" />`
+            : `<textarea id="text-${step.id}" data-text="${step.id}"
+                placeholder="${escapeHtml(step.placeholder || "")}">${escapeHtml(
+                state.answers[step.id] || ""
+              )}</textarea>`
+        }
+        ${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}
       </div>
     `;
   }
@@ -311,7 +330,7 @@
     if (step.type === "stars") body = renderStars(step);
     else if (step.type === "emoji") body = renderEmoji(step);
     else if (step.type === "choice") body = renderChoice(step);
-    else if (step.type === "text") body = renderText(step);
+    else if (step.type === "text" || step.type === "input") body = renderText(step);
 
     const isLast = state.step === STEPS.length - 1;
     return `

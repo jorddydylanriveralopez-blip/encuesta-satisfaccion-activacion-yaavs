@@ -6,6 +6,7 @@
   let index = 0;
 
   const LABELS = {
+    clave: "Clave YAAVSER",
     experiencia: "Experiencia general",
     satisfaccion: "Satisfacción",
     gusto: "Lo que más gustó",
@@ -47,11 +48,11 @@
   function renderStats() {
     statsEl.innerHTML = `
       <div class="stat"><span>Respuestas</span><strong>${items.length}</strong></div>
+      <div class="stat"><span>Última clave</span><strong style="font-size:1.05rem">${escapeHtml(
+        items[0]?.clave || "—"
+      )}</strong></div>
       <div class="stat"><span>Exp. promedio</span><strong>${avg("experiencia")}</strong></div>
       <div class="stat"><span>Atención promedio</span><strong>${avg("atencion")}</strong></div>
-      <div class="stat"><span>Satisfacción top</span><strong style="font-size:1.05rem">${escapeHtml(
-        mode("satisfaccion")
-      )}</strong></div>
     `;
   }
 

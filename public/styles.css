@@ -375,6 +375,13 @@ h1,
   color: var(--muted);
 }
 
+.field-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--soft);
+  line-height: 1.4;
+}
+
 .field input,
 .field textarea {
   width: 100%;
