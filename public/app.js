@@ -200,14 +200,14 @@
 
   function renderWelcome() {
     return `
-      <section class="panel">
+      <section class="panel panel-hero">
         <p class="kicker">Activación BTL</p>
         <h1>${escapeHtml(cfg.title || "Encuesta de Satisfacción – Activación")}</h1>
         <p class="lead">${escapeHtml(
           cfg.intro ||
             "¡Gracias por participar! Tu opinión nos ayuda a mejorar. Menos de 2 minutos."
         )}</p>
-        <div class="actions">
+        <div class="actions actions-center">
           <button class="btn btn-primary" type="button" data-action="start">Comenzar encuesta</button>
         </div>
         <input class="honeypot" tabindex="-1" autocomplete="off" name="website" id="website" />
@@ -217,7 +217,7 @@
 
   function renderDone() {
     return `
-      <section class="panel done">
+      <section class="panel panel-hero done">
         <div class="done-badge" aria-hidden="true">✓</div>
         <h1>¡Gracias!</h1>
         <p class="lead">Tu opinión ya quedó registrada. Nos ayuda a mejorar la próxima activación YAAVS.</p>
