@@ -160,9 +160,6 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "Error al enviar");
       state.done = true;
-      try {
-        localStorage.setItem("yaavs_sat_activacion_done", "1");
-      } catch (_) {}
     } catch (err) {
       showToast(err.message || "No se pudo enviar. Intenta de nuevo.");
       state.submitting = false;
@@ -393,9 +390,7 @@
   });
 
   try {
-    if (localStorage.getItem("yaavs_sat_activacion_done") === "1") {
-      state.done = true;
-    }
+    localStorage.removeItem("yaavs_sat_activacion_done");
   } catch (_) {}
 
   render();
