@@ -237,9 +237,10 @@
             return `
               <button type="button" class="star-btn ${selected ? "is-selected" : ""}"
                 data-key="${step.id}" data-value="${escapeHtml(opt.value)}" role="radio"
-                aria-checked="${selected}">
+                aria-checked="${selected}" aria-label="${escapeHtml(opt.value)} ${escapeHtml(opt.label)}">
                 <span class="glyph" aria-hidden="true">⭐</span>
-                <span>${escapeHtml(opt.value)} · ${escapeHtml(opt.label)}</span>
+                <span class="star-num">${escapeHtml(opt.value)}</span>
+                <span class="star-label">${escapeHtml(opt.label)}</span>
               </button>
             `;
           })
