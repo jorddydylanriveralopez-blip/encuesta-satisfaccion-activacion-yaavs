@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const ExcelJS = require("exceljs");
 
 (() => {
   try {
@@ -31,21 +32,38 @@ const dataDir = path.join(__dirname, "data");
 const dataFile = path.join(dataDir, "responses.json");
 const SHEETS_WEBHOOK_URL = String(process.env.SHEETS_WEBHOOK_URL || "").trim();
 
+// Orden claro para leer el Excel de izquierda a derecha
 const FIELD_ORDER = [
-  ["receivedAt", "Timestamp"],
-  ["id", "ID"],
   ["clave", "Clave YAAVSER"],
-  ["experiencia", "Experiencia general"],
-  ["satisfaccion", "Satisfacción"],
-  ["gusto", "Lo que más gustó"],
-  ["gustoOtro", "Gusto (otro)"],
-  ["atencion", "Atención del equipo"],
-  ["expectativas", "Expectativas"],
-  ["interesYaavs", "Interés en YAAVS"],
-  ["recomienda", "Recomendaría"],
-  ["mejoras", "Qué mejorarías"],
-  ["comentarios", "Comentarios"],
+  ["receivedAt", "Fecha y hora"],
+  ["experiencia", "1. Experiencia general (1-5)"],
+  ["satisfaccion", "2. Satisfacción"],
+  ["gusto", "3. Lo que más gustó"],
+  ["gustoOtro", "3b. Gusto (otro)"],
+  ["atencion", "4. Atención del equipo (1-5)"],
+  ["expectativas", "5. Expectativas"],
+  ["interesYaavs", "6. Interés en YAAVS"],
+  ["recomienda", "7. ¿Recomendaría?"],
+  ["mejoras", "8. Qué mejorarías"],
+  ["comentarios", "9. Comentarios adicionales"],
+  ["id", "ID interno"],
 ];
+
+const COLUMN_WIDTHS = {
+  clave: 18,
+  receivedAt: 20,
+  experiencia: 26,
+  satisfaccion: 22,
+  gusto: 28,
+  gustoOtro: 24,
+  atencion: 28,
+  expectativas: 24,
+  interesYaavs: 26,
+  recomienda: 18,
+  mejoras: 40,
+  comentarios: 36,
+  id: 28,
+};
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "2mb" }));
@@ -122,6 +140,166 @@ function csvEscape(v) {
   return s;
 }
 
+function formatDateMx(iso) {
+  const d = new Date(iso || "");
+  if (Number.isNaN(d.getTime())) return String(iso || "");
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function sortedItems() {
+  return readResponses()
+    .map(flatten)
+    .sort((a, b) => {
+      const ta = new Date(a.receivedAt || a.timestamp || 0).getTime();
+      const tb = new Date(b.receivedAt || b.timestamp || 0).getTime();
+      return ta - tb;
+    });
+}
+
+async function buildWorkbook(items) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "YAAVS";
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  const sheet = workbook.addWorksheet("Respuestas", {
+    views: [{ state: "frozen", ySplit: 1, xSplit: 2 }],
+  });
+
+  const headers = ["#", ...FIELD_ORDER.map(([, label]) => label)];
+  const keys = FIELD_ORDER.map(([key]) => key);
+
+  sheet.columns = [
+    { key: "_n", width: 6 },
+    ...FIELD_ORDER.map(([key]) => ({
+      key,
+      width: COLUMN_WIDTHS[key] || 22,
+    })),
+  ];
+
+  const headerRow = sheet.addRow(headers);
+  headerRow.height = 28;
+  headerRow.eachCell((cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF0F2440" },
+    };
+    cell.font = {
+      name: "Calibri",
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+      size: 11,
+    };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FF0F2440" } },
+      left: { style: "thin", color: { argb: "FF0F2440" } },
+      bottom: { style: "thin", color: { argb: "FF0F2440" } },
+      right: { style: "thin", color: { argb: "FF0F2440" } },
+    };
+  });
+
+  items.forEach((row, idx) => {
+    const values = [
+      idx + 1,
+      ...keys.map((k) => {
+        if (k === "receivedAt") return formatDateMx(row.receivedAt || row.timestamp);
+        return row[k] == null || row[k] === "" ? "—" : String(row[k]);
+      }),
+    ];
+    const excelRow = sheet.addRow(values);
+    excelRow.height = 22;
+    const alt = idx % 2 === 1;
+    excelRow.eachCell((cell, colNumber) => {
+      cell.font = { name: "Calibri", size: 11, color: { argb: "FF0F2440" } };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: colNumber <= 2 ? "center" : "left",
+        wrapText: colNumber >= 12,
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFD7E4F0" } },
+        left: { style: "thin", color: { argb: "FFD7E4F0" } },
+        bottom: { style: "thin", color: { argb: "FFD7E4F0" } },
+        right: { style: "thin", color: { argb: "FFD7E4F0" } },
+      };
+      if (alt) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF4F8FC" },
+        };
+      }
+      if (colNumber === 2) {
+        cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF0097B2" } };
+      }
+    });
+  });
+
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: Math.max(1, items.length + 1), column: headers.length },
+  };
+
+  const summary = workbook.addWorksheet("Resumen");
+  summary.columns = [
+    { key: "metric", width: 36 },
+    { key: "value", width: 28 },
+  ];
+  const title = summary.addRow(["Encuesta de Satisfacción – Activación YAAVS", ""]);
+  title.font = { name: "Calibri", bold: true, size: 14, color: { argb: "FF0F2440" } };
+  summary.mergeCells(1, 1, 1, 2);
+  summary.addRow([]);
+  summary.addRow(["Total de respuestas", items.length]).font = { bold: true };
+  summary.addRow(["Generado", formatDateMx(new Date().toISOString())]);
+
+  const avg = (key) => {
+    const nums = items.map((r) => Number(r[key])).filter((n) => Number.isFinite(n) && n > 0);
+    if (!nums.length) return "—";
+    return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+  };
+  summary.addRow([]);
+  summary.addRow(["Promedio experiencia general (1-5)", avg("experiencia")]);
+  summary.addRow(["Promedio atención del equipo (1-5)", avg("atencion")]);
+
+  const mode = (key) => {
+    const map = new Map();
+    items.forEach((r) => {
+      const v = String(r[key] || "").trim();
+      if (!v || v === "—") return;
+      map.set(v, (map.get(v) || 0) + 1);
+    });
+    let best = "—";
+    let n = 0;
+    map.forEach((count, val) => {
+      if (count > n) {
+        n = count;
+        best = `${val} (${count})`;
+      }
+    });
+    return best;
+  };
+  summary.addRow(["Satisfacción más frecuente", mode("satisfaccion")]);
+  summary.addRow(["Lo que más gustó (top)", mode("gusto")]);
+  summary.addRow(["¿Recomendaría? (top)", mode("recomienda")]);
+
+  summary.getRow(3).eachCell((c) => {
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F0F8" } };
+  });
+
+  return workbook;
+}
+
 app.post("/api/submit", async (req, res) => {
   try {
     if (req.body?.website || req.body?.answers?.website) {
@@ -150,20 +328,50 @@ app.get("/api/responses", (_req, res) => {
   });
 });
 
+app.get("/api/export.xlsx", async (_req, res) => {
+  try {
+    const items = sortedItems();
+    const workbook = await buildWorkbook(items);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `Encuesta_Satisfaccion_Activacion_YAAVS_${stamp}.xlsx`;
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "No se pudo generar el Excel" });
+  }
+});
+
 app.get("/api/export.csv", (_req, res) => {
-  const items = readResponses().map(flatten);
-  const headers = FIELD_ORDER.map(([, label]) => label);
+  const items = sortedItems();
+  const headers = ["#", ...FIELD_ORDER.map(([, label]) => label)];
   const keys = FIELD_ORDER.map(([key]) => key);
   const lines = [headers.map(csvEscape).join(",")];
-  for (const row of items) {
-    lines.push(keys.map((k) => csvEscape(row[k])).join(","));
-  }
+  items.forEach((row, idx) => {
+    const values = [
+      String(idx + 1),
+      ...keys.map((k) => {
+        if (k === "receivedAt") return formatDateMx(row.receivedAt || row.timestamp);
+        return row[k] == null ? "" : String(row[k]);
+      }),
+    ];
+    lines.push(values.map(csvEscape).join(","));
+  });
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader(
     "Content-Disposition",
-    'attachment; filename="encuesta-satisfaccion-activacion.csv"'
+    'attachment; filename="Encuesta_Satisfaccion_Activacion_YAAVS.csv"'
   );
   res.send("\uFEFF" + lines.join("\n"));
+});
+
+app.get("/api/export", (_req, res) => {
+  res.redirect(302, "/api/export.xlsx");
 });
 
 app.get("/api/health", (_req, res) => {
