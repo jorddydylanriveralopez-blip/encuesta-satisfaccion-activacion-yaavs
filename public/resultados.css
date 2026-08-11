@@ -1,11 +1,14 @@
 :root {
-  --ink: #f4f8fc;
-  --muted: #9bb0c4;
-  --line: rgba(255, 255, 255, 0.12);
-  --surface: rgba(10, 22, 38, 0.78);
-  --cyan: #2ec8e6;
-  --font: "Outfit", "Segoe UI", sans-serif;
-  --display: "Syne", "Outfit", sans-serif;
+  --navy: #0f2440;
+  --blue: #2563b5;
+  --teal: #0097b2;
+  --ink: #0f2440;
+  --muted: #5a738c;
+  --line: rgba(15, 36, 64, 0.1);
+  --surface: #ffffff;
+  --font: "Manrope", "Segoe UI", sans-serif;
+  --display: "Sora", "Manrope", sans-serif;
+  --shadow: 0 16px 40px rgba(15, 36, 64, 0.08);
 }
 
 * {
@@ -17,27 +20,38 @@ body {
   min-height: 100vh;
   font-family: var(--font);
   color: var(--ink);
-  background: #040a12;
+  background: #f7fbff;
 }
 
-.scene-bg {
+.atmosphere {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4fa 100%);
 }
 
-.scene-photo {
+.wash {
   position: absolute;
-  inset: 0;
-  background: url("./assets/bg-yaavs-tech.jpg") center / cover no-repeat;
-  filter: brightness(0.55) saturate(1.05);
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
 }
 
-.scene-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(4, 10, 18, 0.78), rgba(4, 10, 18, 0.88));
+.wash-a {
+  width: 360px;
+  height: 360px;
+  top: -100px;
+  left: -60px;
+  background: rgba(37, 99, 181, 0.16);
+}
+
+.wash-b {
+  width: 300px;
+  height: 300px;
+  right: -80px;
+  bottom: 10%;
+  background: rgba(0, 151, 178, 0.12);
 }
 
 .topbar,
@@ -62,14 +76,15 @@ body {
 }
 
 .brand-logo {
-  width: 140px;
+  width: 130px;
   height: auto;
 }
 
 .topbar h1 {
   margin: 0;
   font-family: var(--display);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  color: var(--navy);
 }
 
 .live-line {
@@ -85,15 +100,8 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2dd4a0;
-  box-shadow: 0 0 0 4px rgba(45, 212, 160, 0.2);
-  animation: pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.55;
-  }
+  background: #0d8a5a;
+  box-shadow: 0 0 0 4px rgba(13, 138, 90, 0.15);
 }
 
 .top-actions {
@@ -102,14 +110,14 @@ body {
 }
 
 .ghost-link {
-  color: var(--ink);
+  color: var(--navy);
   text-decoration: none;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 8px 14px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.88rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: #fff;
 }
 
 .layout {
@@ -129,28 +137,30 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 16px 18px;
-  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
 }
 
 .stat strong {
   display: block;
   font-family: var(--display);
-  font-size: 1.7rem;
+  font-size: 1.65rem;
   margin-top: 4px;
+  color: var(--navy);
 }
 
 .stat span {
   color: var(--muted);
   font-size: 0.84rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .card h2 {
   margin: 0 0 12px;
   font-family: var(--display);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
+  color: var(--navy);
 }
 
 .nav {
@@ -163,12 +173,12 @@ body {
 .nav button {
   appearance: none;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.05);
+  background: #f8fbfe;
   color: var(--ink);
   border-radius: 999px;
   padding: 8px 14px;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -187,7 +197,7 @@ body {
   display: grid;
   gap: 4px;
   padding: 12px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 .row:first-child {
@@ -197,9 +207,8 @@ body {
 
 .row b {
   font-size: 0.8rem;
-  color: var(--cyan);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  color: var(--teal);
+  font-weight: 800;
 }
 
 .row span {
