@@ -1,0 +1,157 @@
+name: Create Hostinger free website (temp)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create free subdomain website
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ secrets.HOSTINGER_USERNAME }}
+        run: |
+          node <<'NODE'
+          const TOKEN = process.env.HOSTINGER_API_TOKEN;
+          const USERNAME = process.env.HOSTINGER_USERNAME || 'u376360150';
+          if (!TOKEN) throw new Error('HOSTINGER_API_TOKEN missing');
+          console.log('token_present', true, 'token_len', TOKEN.length, 'username', USERNAME);
+
+          const BASE = 'https://developers.hostinger.com';
+          const headers = {
+            Authorization: `Bearer ${TOKEN}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'gh-actions-create-site/1.0',
+          };
+          const USED = new Set([
+            'coral-oryx-137304.hostingersite.com',
+            'dodgerblue-zebra-542971.hostingersite.com',
+            'gray-manatee-704328.hostingersite.com',
+            'grey-ram-535914.hostingersite.com',
+            'lawngreen-guanaco-656732.hostingersite.com',
+            'lightslategrey-deer-478072.hostingersite.com',
+            'darkslateblue-dotterel-122421.hostingersite.com',
+            'antiquewhite-gnat-916423.hostingersite.com',
+          ]);
+          const ORDER_ID = 1005163589;
+
+          async function req(method, path, body) {
+            const res = await fetch(`${BASE}${path}`, {
+              method,
+              headers,
+              body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 2000) }; }
+            // Never log token
+            const safe = JSON.stringify(data).replaceAll(TOKEN, '***');
+            console.log(method, path, 'status', res.status, 'body', safe.slice(0, 2500));
+            return { status: res.status, data };
+          }
+
+          function extractDomain(obj, found = []) {
+            if (!obj || typeof obj !== 'object') return found;
+            if (Array.isArray(obj)) {
+              obj.forEach((x) => extractDomain(x, found));
+              return found;
+            }
+            for (const [k, v] of Object.entries(obj)) {
+              if (typeof v === 'string' && v.includes('hostingersite.com')) found.push(v);
+              else if (typeof v === 'object') extractDomain(v, found);
+            }
+            return found;
+          }
+
+          (async () => {
+            // 1) List existing websites
+            const list = await req('GET', '/api/hosting/v1/websites?per_page=100');
+            const existing = [...new Set(extractDomain(list.data))];
+            console.log('EXISTING_DOMAINS', existing.join(','));
+            existing.forEach((d) => USED.add(d));
+
+            // 2) Request free subdomain(s)
+            let candidates = [];
+            for (const payload of [{}, { order_id: ORDER_ID }, { username: USERNAME }]) {
+              const free = await req('POST', '/api/hosting/v1/domains/free-subdomains', payload);
+              candidates.push(...extractDomain(free.data));
+              // Also accept subdomain without TLD if returned as "color-animal-123"
+              const walk = (o) => {
+                if (!o || typeof o !== 'object') return;
+                if (Array.isArray(o)) return o.forEach(walk);
+                for (const [k, v] of Object.entries(o)) {
+                  if (typeof v === 'string' && /^[a-z]+-[a-z]+-\d+$/i.test(v)) {
+                    candidates.push(`${v}.hostingersite.com`);
+                  } else if (typeof v === 'object') walk(v);
+                }
+              };
+              walk(free.data);
+              if (candidates.length) break;
+            }
+            candidates = [...new Set(candidates)].filter((d) => d.endsWith('.hostingersite.com') && !USED.has(d));
+            console.log('CANDIDATES', candidates.join(',') || '(none)');
+
+            if (!candidates.length) {
+              console.error('NO_FREE_SUBDOMAIN_RETURNED');
+              // Try listing again for unused empty sites? Fail clearly.
+              process.exit(1);
+            }
+
+            const DOMAIN = candidates[0];
+            console.log('CHOSEN_DOMAIN', DOMAIN);
+
+            // 3) Create website
+            const create = await req('POST', '/api/hosting/v1/websites', {
+              domain: DOMAIN,
+              order_id: ORDER_ID,
+            });
+            if (create.status >= 400) {
+              // Retry with alternate payloads seen historically
+              const create2 = await req('POST', '/api/hosting/v1/websites', {
+                domain: DOMAIN,
+                order_id: ORDER_ID,
+                username: USERNAME,
+              });
+              if (create2.status >= 400) {
+                console.error('CREATE_FAILED');
+                process.exit(1);
+              }
+            }
+
+            // 4) Wait until website appears
+            let found = false;
+            for (let i = 1; i <= 24; i++) {
+              await new Promise((r) => setTimeout(r, 5000));
+              const check = await req('GET', `/api/hosting/v1/websites?domain=${encodeURIComponent(DOMAIN)}`);
+              const domains = extractDomain(check.data);
+              const list2 = await req('GET', '/api/hosting/v1/websites?per_page=100');
+              const all = [...new Set([...domains, ...extractDomain(list2.data)])];
+              console.log('WAIT', i, 'has', all.includes(DOMAIN), 'all_count', all.length);
+              if (all.includes(DOMAIN) || (check.status >= 200 && check.status < 300 && JSON.stringify(check.data).includes(DOMAIN.split('.')[0]))) {
+                found = true;
+                break;
+              }
+              // Also probe upload-urls / builds endpoint readiness
+              const probe = await req('POST', '/api/hosting/v1/files/upload-urls', {
+                username: USERNAME,
+                domain: DOMAIN,
+              });
+              if (probe.status === 200) {
+                found = true;
+                break;
+              }
+            }
+
+            console.log('NEW_DOMAIN=' + DOMAIN);
+            console.log('SITE_READY=' + found);
+            if (!found) {
+              console.error('SITE_NOT_VISIBLE_YET_BUT_DOMAIN_ISSUED');
+              // Still exit 0 so we can use the domain; deploy may need wait
+            }
+          })().catch((e) => {
+            console.error('FATAL', e.message);
+            process.exit(1);
+          });
+          NODE
