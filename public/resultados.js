@@ -503,6 +503,32 @@
   document.getElementById("btnRefresh").addEventListener("click", load);
   document.getElementById("btnClear").addEventListener("click", clearFilters);
 
+  document.getElementById("btnExcel").addEventListener("click", async () => {
+    const btn = document.getElementById("btnExcel");
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Generando…";
+    try {
+      const res = await fetch("./api/export.xlsx", { cache: "no-store" });
+      if (!res.ok) throw new Error("export failed");
+      const blob = await res.blob();
+      const stamp = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Encuesta_Satisfaccion_YAAVS_${stamp}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (_) {
+      window.location.href = "./api/export.xlsx";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prev;
+    }
+  });
+
   [qEl, fSatisfaccion, fRecomienda, fExperiencia, desdeEl, hastaEl, ordenEl].forEach((el) => {
     el.addEventListener("input", () => {
       lastBoardKey = "";

@@ -36,34 +36,38 @@ const SHEETS_WEBHOOK_URL = String(process.env.SHEETS_WEBHOOK_URL || "").trim();
 const FIELD_ORDER = [
   ["clave", "Clave YAAVSER"],
   ["receivedAt", "Fecha y hora"],
-  ["experiencia", "1. Experiencia general (1-5)"],
-  ["satisfaccion", "2. Satisfacción"],
-  ["gusto", "3. Lo que más gustó"],
-  ["gustoOtro", "3b. Gusto (otro)"],
-  ["atencion", "4. Atención del equipo (1-5)"],
-  ["expectativas", "5. Expectativas"],
-  ["interesYaavs", "6. Interés en YAAVS"],
-  ["recomienda", "7. ¿Recomendaría?"],
-  ["mejoras", "8. Qué mejorarías"],
-  ["comentarios", "9. Comentarios adicionales"],
-  ["id", "ID interno"],
+  ["experiencia", "Experiencia (1-5)"],
+  ["satisfaccion", "Satisfacción"],
+  ["gusto", "Lo que más gustó"],
+  ["gustoOtro", "Gusto (otro)"],
+  ["atencion", "Atención del equipo (1-5)"],
+  ["expectativas", "Expectativas"],
+  ["interesYaavs", "Interés en YAAVS"],
+  ["recomienda", "¿Recomendaría?"],
+  ["mejoras", "Qué mejorarías"],
+  ["comentarios", "Comentarios adicionales"],
 ];
 
 const COLUMN_WIDTHS = {
-  clave: 18,
+  clave: 16,
   receivedAt: 20,
-  experiencia: 26,
+  experiencia: 16,
   satisfaccion: 22,
-  gusto: 28,
-  gustoOtro: 24,
-  atencion: 28,
-  expectativas: 24,
+  gusto: 26,
+  gustoOtro: 22,
+  atencion: 18,
+  expectativas: 22,
   interesYaavs: 26,
-  recomienda: 18,
-  mejoras: 40,
-  comentarios: 36,
-  id: 28,
+  recomienda: 16,
+  mejoras: 42,
+  comentarios: 42,
 };
+
+const NAVY = "FF002B44";
+const TEAL = "FF00A0C8";
+const ALT = "FFF3F8FB";
+const LINE = "FFD5E4EE";
+const INK = "FF071824";
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "2mb" }));
@@ -172,40 +176,44 @@ async function buildWorkbook(items) {
   workbook.modified = new Date();
 
   const sheet = workbook.addWorksheet("Respuestas", {
-    views: [{ state: "frozen", ySplit: 1, xSplit: 2 }],
+    views: [{ state: "frozen", ySplit: 2, xSplit: 2, showGridLines: false }],
   });
 
   const headers = ["#", ...FIELD_ORDER.map(([, label]) => label)];
   const keys = FIELD_ORDER.map(([key]) => key);
+  const colCount = headers.length;
 
   sheet.columns = [
-    { key: "_n", width: 6 },
+    { key: "_n", width: 5 },
     ...FIELD_ORDER.map(([key]) => ({
       key,
-      width: COLUMN_WIDTHS[key] || 22,
+      width: COLUMN_WIDTHS[key] || 20,
     })),
   ];
 
+  // Title banner
+  const titleRow = sheet.addRow([
+    "Encuesta de Satisfacción – Activación YAAVS",
+    ...Array(colCount - 1).fill(""),
+  ]);
+  titleRow.height = 32;
+  sheet.mergeCells(1, 1, 1, colCount);
+  const titleCell = titleRow.getCell(1);
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+  titleCell.font = { name: "Calibri", bold: true, color: { argb: "FFFFFFFF" }, size: 14 };
+  titleCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
   const headerRow = sheet.addRow(headers);
-  headerRow.height = 28;
+  headerRow.height = 30;
   headerRow.eachCell((cell) => {
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF0F2440" },
-    };
-    cell.font = {
-      name: "Calibri",
-      bold: true,
-      color: { argb: "FFFFFFFF" },
-      size: 11,
-    };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TEAL } };
+    cell.font = { name: "Calibri", bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     cell.border = {
-      top: { style: "thin", color: { argb: "FF0F2440" } },
-      left: { style: "thin", color: { argb: "FF0F2440" } },
-      bottom: { style: "thin", color: { argb: "FF0F2440" } },
-      right: { style: "thin", color: { argb: "FF0F2440" } },
+      top: { style: "thin", color: { argb: TEAL } },
+      left: { style: "thin", color: { argb: TEAL } },
+      bottom: { style: "thin", color: { argb: TEAL } },
+      right: { style: "thin", color: { argb: TEAL } },
     };
   });
 
@@ -214,88 +222,122 @@ async function buildWorkbook(items) {
       idx + 1,
       ...keys.map((k) => {
         if (k === "receivedAt") return formatDateMx(row.receivedAt || row.timestamp);
-        return row[k] == null || row[k] === "" ? "—" : String(row[k]);
+        if (k === "experiencia" || k === "atencion") {
+          const n = Number(row[k]);
+          return Number.isFinite(n) && n > 0 ? n : "";
+        }
+        const v = row[k];
+        return v == null || String(v).trim() === "" ? "" : String(v).trim();
       }),
     ];
     const excelRow = sheet.addRow(values);
-    excelRow.height = 22;
+    const longText = String(row.mejoras || "").length > 60 || String(row.comentarios || "").length > 60;
+    excelRow.height = longText ? 36 : 24;
     const alt = idx % 2 === 1;
     excelRow.eachCell((cell, colNumber) => {
-      cell.font = { name: "Calibri", size: 11, color: { argb: "FF0F2440" } };
+      cell.font = { name: "Calibri", size: 11, color: { argb: INK } };
       cell.alignment = {
         vertical: "middle",
-        horizontal: colNumber <= 2 ? "center" : "left",
+        horizontal: colNumber <= 3 || colNumber === 8 || colNumber === 11 ? "center" : "left",
         wrapText: colNumber >= 12,
       };
       cell.border = {
-        top: { style: "thin", color: { argb: "FFD7E4F0" } },
-        left: { style: "thin", color: { argb: "FFD7E4F0" } },
-        bottom: { style: "thin", color: { argb: "FFD7E4F0" } },
-        right: { style: "thin", color: { argb: "FFD7E4F0" } },
+        top: { style: "thin", color: { argb: LINE } },
+        left: { style: "thin", color: { argb: LINE } },
+        bottom: { style: "thin", color: { argb: LINE } },
+        right: { style: "thin", color: { argb: LINE } },
       };
       if (alt) {
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FFF4F8FC" },
-        };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } };
       }
       if (colNumber === 2) {
-        cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF0097B2" } };
+        cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: TEAL } };
       }
     });
   });
 
   sheet.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: Math.max(1, items.length + 1), column: headers.length },
+    from: { row: 2, column: 1 },
+    to: { row: Math.max(2, items.length + 2), column: colCount },
   };
 
-  const summary = workbook.addWorksheet("Resumen");
+  // Resumen
+  const summary = workbook.addWorksheet("Resumen", {
+    views: [{ showGridLines: false }],
+  });
   summary.columns = [
-    { key: "metric", width: 36 },
-    { key: "value", width: 28 },
+    { key: "a", width: 38 },
+    { key: "b", width: 18 },
+    { key: "c", width: 14 },
+    { key: "d", width: 14 },
   ];
-  const title = summary.addRow(["Encuesta de Satisfacción – Activación YAAVS", ""]);
-  title.font = { name: "Calibri", bold: true, size: 14, color: { argb: "FF0F2440" } };
-  summary.mergeCells(1, 1, 1, 2);
+
+  const sTitle = summary.addRow(["Encuesta de Satisfacción – Activación YAAVS", "", "", ""]);
+  summary.mergeCells(1, 1, 1, 4);
+  sTitle.height = 30;
+  sTitle.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+  sTitle.getCell(1).font = { name: "Calibri", bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+  sTitle.getCell(1).alignment = { vertical: "middle", indent: 1 };
+
   summary.addRow([]);
-  summary.addRow(["Total de respuestas", items.length]).font = { bold: true };
-  summary.addRow(["Generado", formatDateMx(new Date().toISOString())]);
+  const meta1 = summary.addRow(["Total de respuestas", items.length, "", ""]);
+  meta1.getCell(1).font = { bold: true, name: "Calibri", color: { argb: INK } };
+  meta1.getCell(2).font = { bold: true, name: "Calibri", size: 14, color: { argb: TEAL } };
+  summary.addRow(["Generado", formatDateMx(new Date().toISOString()), "", ""]);
 
   const avg = (key) => {
     const nums = items.map((r) => Number(r[key])).filter((n) => Number.isFinite(n) && n > 0);
     if (!nums.length) return "—";
-    return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+    return Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2));
   };
   summary.addRow([]);
-  summary.addRow(["Promedio experiencia general (1-5)", avg("experiencia")]);
-  summary.addRow(["Promedio atención del equipo (1-5)", avg("atencion")]);
+  const hInd = summary.addRow(["Indicadores", "Valor", "", ""]);
+  hInd.eachCell((c, i) => {
+    if (i > 2) return;
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TEAL } };
+    c.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+  });
+  summary.addRow(["Promedio experiencia (1-5)", avg("experiencia"), "", ""]);
+  summary.addRow(["Promedio atención del equipo (1-5)", avg("atencion"), "", ""]);
+  summary.addRow([
+    "Recomendarían (Sí)",
+    items.filter((r) => String(r.recomienda || "").toLowerCase() === "sí").length,
+    "",
+    "",
+  ]);
 
-  const mode = (key) => {
+  const distBlock = (title, key) => {
+    summary.addRow([]);
+    const head = summary.addRow([title, "Cantidad", "%", ""]);
+    head.eachCell((c, i) => {
+      if (i > 3) return;
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+      c.font = { bold: true, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+    });
     const map = new Map();
     items.forEach((r) => {
       const v = String(r[key] || "").trim();
-      if (!v || v === "—") return;
+      if (!v) return;
       map.set(v, (map.get(v) || 0) + 1);
     });
-    let best = "—";
-    let n = 0;
-    map.forEach((count, val) => {
-      if (count > n) {
-        n = count;
-        best = `${val} (${count})`;
-      }
-    });
-    return best;
+    const total = [...map.values()].reduce((a, b) => a + b, 0) || 1;
+    [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([label, count], i) => {
+        const row = summary.addRow([label, count, Math.round((count / total) * 100), ""]);
+        if (i % 2 === 1) {
+          row.eachCell((c, idx) => {
+            if (idx > 3) return;
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT } };
+          });
+        }
+      });
   };
-  summary.addRow(["Satisfacción más frecuente", mode("satisfaccion")]);
-  summary.addRow(["Lo que más gustó (top)", mode("gusto")]);
-  summary.addRow(["¿Recomendaría? (top)", mode("recomienda")]);
 
-  summary.getRow(3).eachCell((c) => {
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F0F8" } };
-  });
+  distBlock("Distribución · Satisfacción", "satisfaccion");
+  distBlock("Distribución · ¿Recomendaría?", "recomienda");
+  distBlock("Distribución · Experiencia", "experiencia");
+  distBlock("Distribución · Lo que más gustó", "gusto");
 
   return workbook;
 }
@@ -333,12 +375,16 @@ app.get("/api/export.xlsx", async (_req, res) => {
     const items = sortedItems();
     const workbook = await buildWorkbook(items);
     const stamp = new Date().toISOString().slice(0, 10);
-    const filename = `Encuesta_Satisfaccion_Activacion_YAAVS_${stamp}.xlsx`;
+    const filename = `Encuesta_Satisfaccion_YAAVS_${stamp}.xlsx`;
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+    );
+    res.setHeader("Cache-Control", "no-store");
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
