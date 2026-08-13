@@ -370,23 +370,41 @@ app.get("/api/responses", (_req, res) => {
   });
 });
 
+async function sendExcel(res) {
+  const items = sortedItems();
+  const workbook = await buildWorkbook(items);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const filename = `Encuesta_Satisfaccion_YAAVS_${stamp}.xlsx`;
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+  );
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private, max-age=0");
+  res.setHeader("CDN-Cache-Control", "no-store");
+  res.setHeader("Surrogate-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
 app.get("/api/export.xlsx", async (_req, res) => {
   try {
-    const items = sortedItems();
-    const workbook = await buildWorkbook(items);
-    const stamp = new Date().toISOString().slice(0, 10);
-    const filename = `Encuesta_Satisfaccion_YAAVS_${stamp}.xlsx`;
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
-    );
-    res.setHeader("Cache-Control", "no-store");
-    await workbook.xlsx.write(res);
-    res.end();
+    await sendExcel(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "No se pudo generar el Excel" });
+  }
+});
+
+// Ruta nueva para evitar caché CDN del .xlsx anterior
+app.get("/api/descargar-excel", async (_req, res) => {
+  try {
+    await sendExcel(res);
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "No se pudo generar el Excel" });

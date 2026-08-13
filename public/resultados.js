@@ -405,7 +405,7 @@
       .join("");
     modalActions.innerHTML = `
       <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV de esta respuesta</button>
-      <a class="btn btn-soft" href="./api/export.xlsx">Excel completo</a>
+      <a class="btn btn-soft" href="./api/descargar-excel" data-excel>Excel completo</a>
     `;
     if (typeof modal.showModal === "function") modal.showModal();
     else modal.setAttribute("open", "");
@@ -509,20 +509,25 @@
     btn.disabled = true;
     btn.textContent = "Generando…";
     try {
-      const res = await fetch("./api/export.xlsx", { cache: "no-store" });
+      const url = `./api/descargar-excel?ts=${Date.now()}`;
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      // follow redirect manually if needed — fetch follows by default
       if (!res.ok) throw new Error("export failed");
       const blob = await res.blob();
       const stamp = new Date().toISOString().slice(0, 10);
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objectUrl;
       a.download = `Encuesta_Satisfaccion_YAAVS_${stamp}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
     } catch (_) {
-      window.location.href = "./api/export.xlsx";
+      window.location.href = `./api/descargar-excel?ts=${Date.now()}`;
     } finally {
       btn.disabled = false;
       btn.textContent = prev;
