@@ -511,12 +511,15 @@ a {
   background: var(--surface);
   box-shadow: 0 14px 40px rgba(7, 40, 60, 0.08);
   outline: 1px solid rgba(7, 24, 36, 0.06);
-  opacity: 0;
-  transform: translateY(14px);
-  animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease;
+}
+
+.item-enter {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .item:hover {

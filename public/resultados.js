@@ -21,6 +21,10 @@
   let view = "grid";
   let lastSync = null;
   let optionsFilled = false;
+  let lastBoardKey = "";
+  let lastMetricsKey = "";
+  let lastChartsKey = "";
+  let animateCards = true;
   const charts = {
     satisfaccion: null,
     recomienda: null,
@@ -214,7 +218,7 @@
       charts[name].data.labels = labels;
       charts[name].data.datasets[0].data = values;
       charts[name].data.datasets[0].backgroundColor = colors;
-      charts[name].update("active");
+      charts[name].update("none");
       return;
     }
 
@@ -235,7 +239,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { animateRotate: true, duration: 650 },
+        animation: false,
         plugins: {
           legend: {
             position: "bottom",
@@ -278,6 +282,10 @@
     const exp = tally(list, "experiencia", expOrder);
     exp.labels = exp.labels.map((n) => `${n}/5`);
 
+    const chartsKey = JSON.stringify({ sat, rec, exp });
+    if (chartsKey === lastChartsKey) return;
+    lastChartsKey = chartsKey;
+
     upsertPie("satisfaccion", "chartSatisfaccion", "emptySatisfaccion", sat.labels, sat.values);
     upsertPie("recomienda", "chartRecomienda", "emptyRecomienda", rec.labels, rec.values);
     upsertPie("experiencia", "chartExperiencia", "emptyExperiencia", exp.labels, exp.values);
@@ -285,9 +293,10 @@
 
   function cardHtml(r, i) {
     const lvl = level(r.experiencia);
-    const delay = Math.min(i * 0.04, 0.35);
+    const animClass = animateCards ? "item item-enter" : "item";
+    const delay = animateCards ? Math.min(i * 0.04, 0.35) : 0;
     return `
-      <li class="item" style="animation-delay:${delay}s">
+      <li class="${animClass}" style="animation-delay:${delay}s" data-id="${escapeHtml(r.id)}">
         <button type="button" class="item-hit" data-open="${escapeHtml(r.id)}">
           <div class="item-media">
             <div class="item-media-glow" aria-hidden="true"></div>
@@ -315,13 +324,42 @@
     `;
   }
 
-  function renderBoard() {
+  function boardKey(list) {
+    return `${view}|${list.map((r) => r.id).join(",")}|${qEl.value}|${fSatisfaccion.value}|${
+      fRecomienda.value
+    }|${fExperiencia.value}|${desdeEl.value}|${hastaEl.value}|${ordenEl.value}`;
+  }
+
+  function metricsKey(list) {
+    return [
+      list.length,
+      avg(list, "experiencia"),
+      avg(list, "atencion"),
+      list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length,
+      formatTime(lastSync),
+    ].join("|");
+  }
+
+  function renderBoard(forceCards = false) {
     const list = filtered();
     liveCount.textContent = String(items.length);
     groupCount.textContent = `${list.length}`;
     groupTitle.textContent = list.length === 1 ? "Respuesta" : "Respuestas";
-    renderMetrics(list);
+
+    const mKey = metricsKey(list);
+    if (mKey !== lastMetricsKey) {
+      lastMetricsKey = mKey;
+      renderMetrics(list);
+    } else if (lastSync) {
+      const syncEl = metricsEl.querySelector(".metric-time strong");
+      if (syncEl) syncEl.textContent = formatTime(lastSync);
+    }
+
     renderCharts(list);
+
+    const bKey = boardKey(list);
+    if (!forceCards && bKey === lastBoardKey) return;
+    lastBoardKey = bKey;
 
     boardEl.className = `board board-${view === "list" ? "list" : "grid"}`;
 
@@ -334,11 +372,13 @@
       emptyEl.querySelector("p").textContent = items.length
         ? "Prueba limpiar filtros o cambiar la búsqueda."
         : "Cuando alguien complete la encuesta, aparecerá aquí en tiempo real.";
+      animateCards = false;
       return;
     }
 
     emptyEl.hidden = true;
     boardEl.innerHTML = list.map((r, i) => cardHtml(r, i)).join("");
+    animateCards = false;
   }
 
   function findById(id) {
@@ -403,16 +443,26 @@
     desdeEl.value = "";
     hastaEl.value = "";
     ordenEl.value = "fecha-desc";
-    renderBoard();
+    lastBoardKey = "";
+    renderBoard(true);
   }
 
   async function load() {
     try {
       const res = await fetch("/api/responses", { cache: "no-store" });
       const data = await res.json();
-      items = Array.isArray(data.responses) ? data.responses : [];
+      const next = Array.isArray(data.responses) ? data.responses : [];
+      const prevSig = items.map((r) => r.id).join(",");
+      const nextSig = next.map((r) => r.id).join(",");
+      items = next;
       lastSync = new Date().toISOString();
       fillSatisfaccionOptions(items);
+      if (prevSig !== nextSig) {
+        animateCards = prevSig === "" ? true : false;
+        lastBoardKey = "";
+        lastChartsKey = "";
+        lastMetricsKey = "";
+      }
       renderBoard();
     } catch (_) {
       liveCount.textContent = "!";
@@ -454,22 +504,34 @@
   document.getElementById("btnClear").addEventListener("click", clearFilters);
 
   [qEl, fSatisfaccion, fRecomienda, fExperiencia, desdeEl, hastaEl, ordenEl].forEach((el) => {
-    el.addEventListener("input", renderBoard);
-    el.addEventListener("change", renderBoard);
+    el.addEventListener("input", () => {
+      lastBoardKey = "";
+      lastChartsKey = "";
+      lastMetricsKey = "";
+      renderBoard(true);
+    });
+    el.addEventListener("change", () => {
+      lastBoardKey = "";
+      lastChartsKey = "";
+      lastMetricsKey = "";
+      renderBoard(true);
+    });
   });
 
   document.getElementById("viewGrid").addEventListener("click", () => {
     view = "grid";
     document.getElementById("viewGrid").classList.add("on");
     document.getElementById("viewList").classList.remove("on");
-    renderBoard();
+    lastBoardKey = "";
+    renderBoard(true);
   });
 
   document.getElementById("viewList").addEventListener("click", () => {
     view = "list";
     document.getElementById("viewList").classList.add("on");
     document.getElementById("viewGrid").classList.remove("on");
-    renderBoard();
+    lastBoardKey = "";
+    renderBoard(true);
   });
 
   function boot() {
