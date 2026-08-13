@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./resultados.css?v=20260813a" />
+    <link rel="stylesheet" href="./resultados.css?v=20260813c" />
   </head>
   <body>
     <div class="shell">
@@ -53,6 +53,36 @@
 
       <main class="page">
         <section class="metrics" id="metrics" aria-label="Indicadores"></section>
+
+        <section class="charts" aria-label="Gráficas en vivo">
+          <div class="charts-head">
+            <h2>Gráficas en vivo</h2>
+            <p>Se actualizan solas con cada respuesta nueva.</p>
+          </div>
+          <div class="charts-grid">
+            <article class="chart-card">
+              <h3>Satisfacción</h3>
+              <div class="chart-wrap">
+                <canvas id="chartSatisfaccion" aria-label="Pastel de satisfacción"></canvas>
+              </div>
+              <p class="chart-empty" id="emptySatisfaccion" hidden>Sin datos</p>
+            </article>
+            <article class="chart-card">
+              <h3>¿Recomendaría?</h3>
+              <div class="chart-wrap">
+                <canvas id="chartRecomienda" aria-label="Pastel de recomendación"></canvas>
+              </div>
+              <p class="chart-empty" id="emptyRecomienda" hidden>Sin datos</p>
+            </article>
+            <article class="chart-card">
+              <h3>Experiencia (1–5)</h3>
+              <div class="chart-wrap">
+                <canvas id="chartExperiencia" aria-label="Pastel de experiencia"></canvas>
+              </div>
+              <p class="chart-empty" id="emptyExperiencia" hidden>Sin datos</p>
+            </article>
+          </div>
+        </section>
 
         <section class="toolbar" aria-label="Filtros">
           <label class="field field-search">
@@ -139,6 +169,7 @@
       </div>
     </dialog>
 
-    <script src="./resultados.js?v=20260813a" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="./resultados.js?v=20260813c" defer></script>
   </body>
 </html>

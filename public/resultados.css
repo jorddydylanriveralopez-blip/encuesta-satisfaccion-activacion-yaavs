@@ -257,6 +257,73 @@ a {
   font-size: 1.1rem;
 }
 
+.charts {
+  margin-top: 1.15rem;
+  animation: rise 0.64s ease both;
+}
+
+.charts-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.charts-head h2 {
+  margin: 0;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+}
+
+.charts-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.chart-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 18px;
+  outline: 1px solid rgba(7, 24, 36, 0.06);
+  box-shadow: 0 14px 40px rgba(7, 40, 60, 0.08);
+  padding: 1rem 1rem 0.85rem;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card h3 {
+  margin: 0 0 0.35rem;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 0.95rem;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+}
+
+.chart-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 210px;
+}
+
+.chart-empty {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: 1.5fr repeat(5, minmax(0, 0.85fr)) auto;
@@ -763,6 +830,10 @@ a {
 }
 
 @media (max-width: 1100px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
   .toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

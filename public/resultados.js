@@ -21,6 +21,22 @@
   let view = "grid";
   let lastSync = null;
   let optionsFilled = false;
+  const charts = {
+    satisfaccion: null,
+    recomienda: null,
+    experiencia: null,
+  };
+
+  const PIE_COLORS = [
+    "#00a0c8",
+    "#002b44",
+    "#34c4e8",
+    "#e8c547",
+    "#c83048",
+    "#28785a",
+    "#6b8296",
+    "#014866",
+  ];
 
   const LABELS = {
     clave: "Clave YAAVSER",
@@ -173,6 +189,112 @@
     `;
   }
 
+  function tally(list, key, order) {
+    const map = new Map();
+    list.forEach((r) => {
+      const v = String(r[key] || "").trim();
+      if (!v) return;
+      map.set(v, (map.get(v) || 0) + 1);
+    });
+    const keys = order
+      ? order.filter((k) => map.has(k)).concat([...map.keys()].filter((k) => !order.includes(k)))
+      : [...map.keys()].sort((a, b) => map.get(b) - map.get(a) || a.localeCompare(b, "es"));
+    return {
+      labels: keys,
+      values: keys.map((k) => map.get(k)),
+    };
+  }
+
+  function upsertPie(name, canvasId, emptyId, labels, values) {
+    const canvas = document.getElementById(canvasId);
+    const empty = document.getElementById(emptyId);
+    if (!canvas || typeof Chart === "undefined") return;
+
+    const hasData = values.some((n) => n > 0);
+    empty.hidden = hasData;
+    canvas.style.display = hasData ? "block" : "none";
+    if (!hasData) {
+      if (charts[name]) {
+        charts[name].destroy();
+        charts[name] = null;
+      }
+      return;
+    }
+
+    const colors = labels.map((_, i) => PIE_COLORS[i % PIE_COLORS.length]);
+    if (charts[name]) {
+      charts[name].data.labels = labels;
+      charts[name].data.datasets[0].data = values;
+      charts[name].data.datasets[0].backgroundColor = colors;
+      charts[name].update("active");
+      return;
+    }
+
+    charts[name] = new Chart(canvas, {
+      type: "pie",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderColor: "#fff",
+            borderWidth: 2,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { animateRotate: true, duration: 650 },
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              padding: 12,
+              color: "#3d5568",
+              font: { family: "Outfit", size: 11, weight: "600" },
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
+                const n = ctx.raw || 0;
+                const pct = Math.round((n / total) * 100);
+                return ` ${ctx.label}: ${n} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderCharts(list) {
+    const satOrder = [
+      "Muy satisfecho(a)",
+      "Satisfecho(a)",
+      "Neutral",
+      "Insatisfecho(a)",
+      "Muy insatisfecho(a)",
+    ];
+    const recOrder = ["Sí", "Tal vez", "No"];
+    const expOrder = ["5", "4", "3", "2", "1"];
+
+    const sat = tally(list, "satisfaccion", satOrder);
+    const rec = tally(list, "recomienda", recOrder);
+    const exp = tally(list, "experiencia", expOrder);
+    exp.labels = exp.labels.map((n) => `★ ${n}`);
+
+    upsertPie("satisfaccion", "chartSatisfaccion", "emptySatisfaccion", sat.labels, sat.values);
+    upsertPie("recomienda", "chartRecomienda", "emptyRecomienda", rec.labels, rec.values);
+    upsertPie("experiencia", "chartExperiencia", "emptyExperiencia", exp.labels, exp.values);
+  }
+
   function cardHtml(r, i) {
     const lvl = level(r.experiencia);
     const delay = Math.min(i * 0.04, 0.35);
@@ -212,6 +334,7 @@
     groupCount.textContent = `${list.length}`;
     groupTitle.textContent = list.length === 1 ? "Respuesta" : "Respuestas";
     renderMetrics(list);
+    renderCharts(list);
 
     boardEl.className = `board board-${view === "list" ? "list" : "grid"}`;
 
@@ -362,6 +485,14 @@
     renderBoard();
   });
 
-  load();
-  setInterval(load, 4000);
+  function boot() {
+    if (typeof Chart === "undefined") {
+      setTimeout(boot, 40);
+      return;
+    }
+    load();
+    setInterval(load, 4000);
+  }
+
+  boot();
 })();
