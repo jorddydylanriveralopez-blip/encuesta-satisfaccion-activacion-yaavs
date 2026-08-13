@@ -44,7 +44,8 @@ jobs:
           HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
         run: |
           DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
-          curl -fsS "https://${DOMAIN}/api/responses" -o responses-live.json || echo '{"responses":[]}' > responses-live.json
+          curl -fsS --connect-timeout 10 --max-time 25 "https://${DOMAIN}/api/responses" -o responses-live.json \
+            || echo '{"responses":[]}' > responses-live.json
           python3 -c "import json; d=json.load(open('responses-live.json')); print('backed up', len(d.get('responses') or d.get('items') or []))"
 
       - name: Upload archive and trigger Node build
