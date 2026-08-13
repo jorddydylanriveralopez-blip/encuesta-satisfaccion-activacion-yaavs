@@ -39,6 +39,14 @@ jobs:
       - name: Install upload deps
         run: npm install --no-save axios form-data tus-js-client
 
+      - name: Backup live responses
+        env:
+          HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
+        run: |
+          DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
+          curl -fsS "https://${DOMAIN}/api/responses" -o responses-live.json || echo '{"responses":[]}' > responses-live.json
+          python3 -c "import json; d=json.load(open('responses-live.json')); print('backed up', len(d.get('responses') or d.get('items') or []))"
+
       - name: Upload archive and trigger Node build
         env:
           HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
@@ -246,3 +254,77 @@ jobs:
             process.exit(1);
           });
           NODE
+
+      - name: Restore live responses
+        env:
+          HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
+          RESET_KEY: ${{ secrets.RESET_KEY }}
+        run: |
+          DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
+          export HOSTINGER_DOMAIN="$DOMAIN"
+          export RESET_KEY="${RESET_KEY:-yaavs-reset}"
+          for i in $(seq 1 24); do
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" "https://${DOMAIN}/api/health" || true)
+            if [ "$code" = "200" ]; then echo "health ok"; break; fi
+            echo "waiting health ($i) code=$code"
+            sleep 5
+          done
+          python3 <<'PY'
+          import json, os, time, urllib.request
+          domain = os.environ.get("HOSTINGER_DOMAIN") or "lawngreen-guanaco-656732.hostingersite.com"
+          key = os.environ.get("RESET_KEY") or "yaavs-reset"
+          raw = json.load(open("responses-live.json"))
+          items = raw.get("responses") or raw.get("items") or []
+          if not items:
+              print("nothing to restore")
+              raise SystemExit(0)
+          payload = {
+              "key": key,
+              "mode": "replace",
+              "responses": [
+                  {
+                      "id": r.get("id"),
+                      "receivedAt": r.get("receivedAt"),
+                      "timestamp": r.get("timestamp"),
+                      "answers": {k: v for k, v in r.items() if k not in ("id", "receivedAt", "timestamp")},
+                  }
+                  for r in items
+              ],
+          }
+          for attempt in range(8):
+              try:
+                  req = urllib.request.Request(
+                      f"https://{domain}/api/import",
+                      data=json.dumps(payload).encode(),
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  with urllib.request.urlopen(req, timeout=30) as res:
+                      body = res.read().decode()
+                      print("import", res.status, body[:300])
+                      if res.status < 300:
+                          raise SystemExit(0)
+              except SystemExit:
+                  raise
+              except Exception as e:
+                  print("import failed", e)
+                  time.sleep(3)
+          print("falling back to submit")
+          ordered = sorted(items, key=lambda r: r.get("receivedAt") or "")
+          for r in ordered:
+              body = {
+                  "id": r.get("id"),
+                  "receivedAt": r.get("receivedAt"),
+                  "timestamp": r.get("timestamp"),
+                  "answers": {k: v for k, v in r.items() if k not in ("id", "receivedAt", "timestamp")},
+              }
+              req = urllib.request.Request(
+                  f"https://{domain}/api/submit",
+                  data=json.dumps(body).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=30) as res:
+                  print(r.get("id"), res.status, res.read().decode()[:120])
+          print("restored via submit", len(ordered))
+          PY
