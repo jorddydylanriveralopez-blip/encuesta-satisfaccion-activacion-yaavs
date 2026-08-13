@@ -537,7 +537,7 @@ a {
 
 .item-media {
   position: relative;
-  aspect-ratio: 16 / 11;
+  aspect-ratio: 16 / 7;
   background: linear-gradient(145deg, #01324a, #00506f 45%, #00a0c8);
   overflow: hidden;
   display: grid;
@@ -551,14 +551,6 @@ a {
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), transparent 45%),
     radial-gradient(circle at 80% 70%, rgba(52, 196, 232, 0.35), transparent 50%);
   pointer-events: none;
-}
-
-.item-emoji {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(2.6rem, 6vw, 3.4rem);
-  line-height: 1;
-  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
 }
 
 .item-stars {

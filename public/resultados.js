@@ -52,14 +52,6 @@
     comentarios: "Comentarios",
   };
 
-  const EMOJI = {
-    "Muy insatisfecho(a)": "😞",
-    "Insatisfecho(a)": "🙁",
-    Neutral: "😐",
-    "Satisfecho(a)": "🙂",
-    "Muy satisfecho(a)": "😍",
-  };
-
   function escapeHtml(str) {
     return String(str ?? "")
       .replace(/&/g, "&amp;")
@@ -103,10 +95,6 @@
     if (n >= 5) return { label: "Alto", cls: "badge-alto" };
     if (n >= 3) return { label: "Medio", cls: "badge-medio" };
     return { label: "Bajo", cls: "badge-bajo" };
-  }
-
-  function emojiFor(r) {
-    return EMOJI[r.satisfaccion] || "⭐";
   }
 
   function fillSatisfaccionOptions(list) {
@@ -288,7 +276,7 @@
     const sat = tally(list, "satisfaccion", satOrder);
     const rec = tally(list, "recomienda", recOrder);
     const exp = tally(list, "experiencia", expOrder);
-    exp.labels = exp.labels.map((n) => `★ ${n}`);
+    exp.labels = exp.labels.map((n) => `${n}/5`);
 
     upsertPie("satisfaccion", "chartSatisfaccion", "emptySatisfaccion", sat.labels, sat.values);
     upsertPie("recomienda", "chartRecomienda", "emptyRecomienda", rec.labels, rec.values);
@@ -306,8 +294,7 @@
             <div class="badge-stack">
               <span class="badge ${lvl.cls}">${lvl.label}</span>
             </div>
-            <span class="item-emoji" aria-hidden="true">${emojiFor(r)}</span>
-            <span class="item-stars">★ ${escapeHtml(r.experiencia || "—")}/5</span>
+            <span class="item-stars">${escapeHtml(r.experiencia || "—")}/5</span>
           </div>
           <div class="item-body">
             <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
@@ -365,7 +352,7 @@
     modalHero.innerHTML = `
       <span class="badge ${lvl.cls}">${lvl.label}</span>
       <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
-      <p>${formatDate(r.receivedAt || r.timestamp)} · ${emojiFor(r)} ${escapeHtml(
+      <p>${formatDate(r.receivedAt || r.timestamp)} · ${escapeHtml(
         r.satisfaccion || ""
       )}</p>
     `;
