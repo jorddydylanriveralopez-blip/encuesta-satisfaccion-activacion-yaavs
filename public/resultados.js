@@ -1,9 +1,26 @@
 (() => {
-  const statsEl = document.getElementById("stats");
-  const detailEl = document.getElementById("detail");
-  const liveStatus = document.getElementById("liveStatus");
+  const boardEl = document.getElementById("board");
+  const emptyEl = document.getElementById("empty");
+  const metricsEl = document.getElementById("metrics");
+  const liveCount = document.getElementById("liveCount");
+  const groupCount = document.getElementById("groupCount");
+  const groupTitle = document.getElementById("groupTitle");
+  const fSatisfaccion = document.getElementById("fSatisfaccion");
+  const fRecomienda = document.getElementById("fRecomienda");
+  const fExperiencia = document.getElementById("fExperiencia");
+  const qEl = document.getElementById("q");
+  const desdeEl = document.getElementById("desde");
+  const hastaEl = document.getElementById("hasta");
+  const ordenEl = document.getElementById("orden");
+  const modal = document.getElementById("modal");
+  const modalHero = document.getElementById("modalHero");
+  const modalBody = document.getElementById("modalBody");
+  const modalActions = document.getElementById("modalActions");
+
   let items = [];
-  let index = 0;
+  let view = "grid";
+  let lastSync = null;
+  let optionsFilled = false;
 
   const LABELS = {
     clave: "Clave YAAVSER",
@@ -19,80 +36,13 @@
     comentarios: "Comentarios",
   };
 
-  function avg(key) {
-    const nums = items
-      .map((r) => Number(r[key]))
-      .filter((n) => Number.isFinite(n) && n > 0);
-    if (!nums.length) return "—";
-    return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
-  }
-
-  function mode(key) {
-    const map = new Map();
-    items.forEach((r) => {
-      const v = String(r[key] || "").trim();
-      if (!v) return;
-      map.set(v, (map.get(v) || 0) + 1);
-    });
-    let best = "—";
-    let n = 0;
-    map.forEach((count, val) => {
-      if (count > n) {
-        n = count;
-        best = val;
-      }
-    });
-    return best;
-  }
-
-  function renderStats() {
-    statsEl.innerHTML = `
-      <div class="stat"><span>Respuestas</span><strong>${items.length}</strong></div>
-      <div class="stat"><span>Última clave</span><strong style="font-size:1.05rem">${escapeHtml(
-        items[0]?.clave || "—"
-      )}</strong></div>
-      <div class="stat"><span>Exp. promedio</span><strong>${avg("experiencia")}</strong></div>
-      <div class="stat"><span>Atención promedio</span><strong>${avg("atencion")}</strong></div>
-    `;
-  }
-
-  function renderDetail() {
-    if (!items.length) {
-      detailEl.innerHTML = `<section class="card"><p class="empty">Aún no hay respuestas.</p></section>`;
-      return;
-    }
-    const r = items[index];
-    const rows = Object.keys(LABELS)
-      .map((key) => {
-        const val = r[key];
-        if (val == null || String(val).trim() === "") return "";
-        return `<div class="row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
-      })
-      .join("");
-
-    detailEl.innerHTML = `
-      <section class="card">
-        <h2>Respuesta ${index + 1} de ${items.length}</h2>
-        <div class="nav">
-          <button type="button" id="prevBtn">Anterior</button>
-          <button type="button" id="nextBtn">Siguiente</button>
-        </div>
-        <p class="meta">${escapeHtml(r.receivedAt || r.timestamp || "")} · ${escapeHtml(
-      r.id || ""
-    )}</p>
-        <div class="rows">${rows}</div>
-      </section>
-    `;
-
-    document.getElementById("prevBtn").onclick = () => {
-      index = (index - 1 + items.length) % items.length;
-      renderDetail();
-    };
-    document.getElementById("nextBtn").onclick = () => {
-      index = (index + 1) % items.length;
-      renderDetail();
-    };
-  }
+  const EMOJI = {
+    "Muy insatisfecho(a)": "😞",
+    "Insatisfecho(a)": "🙁",
+    Neutral: "😐",
+    "Satisfecho(a)": "🙂",
+    "Muy satisfecho(a)": "😍",
+  };
 
   function escapeHtml(str) {
     return String(str ?? "")
@@ -102,19 +52,315 @@
       .replace(/"/g, "&quot;");
   }
 
+  function parseDate(iso) {
+    const d = new Date(iso || "");
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatDate(iso) {
+    const d = parseDate(iso);
+    if (!d) return "—";
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(d);
+  }
+
+  function formatTime(iso) {
+    const d = parseDate(iso) || new Date();
+    return new Intl.DateTimeFormat("es-MX", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  }
+
+  function avg(list, key) {
+    const nums = list.map((r) => Number(r[key])).filter((n) => Number.isFinite(n) && n > 0);
+    if (!nums.length) return "—";
+    return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
+  }
+
+  function level(exp) {
+    const n = Number(exp);
+    if (n >= 5) return { label: "Alto", cls: "badge-alto" };
+    if (n >= 3) return { label: "Medio", cls: "badge-medio" };
+    return { label: "Bajo", cls: "badge-bajo" };
+  }
+
+  function emojiFor(r) {
+    return EMOJI[r.satisfaccion] || "⭐";
+  }
+
+  function fillSatisfaccionOptions(list) {
+    if (optionsFilled) return;
+    const set = new Set();
+    list.forEach((r) => {
+      const v = String(r.satisfaccion || "").trim();
+      if (v) set.add(v);
+    });
+    [...set].sort().forEach((v) => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      fSatisfaccion.appendChild(opt);
+    });
+    optionsFilled = true;
+  }
+
+  function filtered() {
+    const q = qEl.value.trim().toLowerCase();
+    const sat = fSatisfaccion.value;
+    const rec = fRecomienda.value;
+    const exp = fExperiencia.value;
+    const desde = desdeEl.value ? new Date(`${desdeEl.value}T00:00:00`) : null;
+    const hasta = hastaEl.value ? new Date(`${hastaEl.value}T23:59:59`) : null;
+
+    let list = items.filter((r) => {
+      if (sat && r.satisfaccion !== sat) return false;
+      if (rec && r.recomienda !== rec) return false;
+      if (exp && String(r.experiencia) !== exp) return false;
+      const d = parseDate(r.receivedAt || r.timestamp);
+      if (desde && d && d < desde) return false;
+      if (hasta && d && d > hasta) return false;
+      if (q) {
+        const hay = [
+          r.clave,
+          r.satisfaccion,
+          r.gusto,
+          r.gustoOtro,
+          r.expectativas,
+          r.interesYaavs,
+          r.recomienda,
+          r.mejoras,
+          r.comentarios,
+          r.id,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const orden = ordenEl.value;
+    list.sort((a, b) => {
+      const da = parseDate(a.receivedAt || a.timestamp)?.getTime() || 0;
+      const db = parseDate(b.receivedAt || b.timestamp)?.getTime() || 0;
+      if (orden === "fecha-asc") return da - db;
+      if (orden === "exp-desc") return Number(b.experiencia || 0) - Number(a.experiencia || 0);
+      if (orden === "clave-asc") {
+        return String(a.clave || "").localeCompare(String(b.clave || ""), "es");
+      }
+      return db - da;
+    });
+
+    return list;
+  }
+
+  function renderMetrics(list) {
+    const recommendYes = list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length;
+    metricsEl.innerHTML = `
+      <div class="metric"><span>Total</span><strong>${list.length}</strong></div>
+      <div class="metric"><span>Exp. promedio</span><strong>${avg(list, "experiencia")}</strong></div>
+      <div class="metric"><span>Atención</span><strong>${avg(list, "atencion")}</strong></div>
+      <div class="metric"><span>Recomiendan</span><strong>${recommendYes}</strong></div>
+      <div class="metric"><span>Viendo</span><strong>${list.length}</strong></div>
+      <div class="metric metric-time"><span>Última sync</span><strong>${
+        lastSync ? formatTime(lastSync) : "—"
+      }</strong></div>
+    `;
+  }
+
+  function cardHtml(r, i) {
+    const lvl = level(r.experiencia);
+    const delay = Math.min(i * 0.04, 0.35);
+    return `
+      <li class="item" style="animation-delay:${delay}s">
+        <button type="button" class="item-hit" data-open="${escapeHtml(r.id)}">
+          <div class="item-media">
+            <div class="item-media-glow" aria-hidden="true"></div>
+            <div class="badge-stack">
+              <span class="badge ${lvl.cls}">${lvl.label}</span>
+            </div>
+            <span class="item-emoji" aria-hidden="true">${emojiFor(r)}</span>
+            <span class="item-stars">★ ${escapeHtml(r.experiencia || "—")}/5</span>
+          </div>
+          <div class="item-body">
+            <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
+            <p class="item-line">${escapeHtml(r.satisfaccion || "—")} · ${escapeHtml(
+              r.gusto || "—"
+            )}</p>
+            <p class="item-meta">${escapeHtml(r.recomienda ? `Recomienda: ${r.recomienda}` : "")}${
+              r.atencion ? ` · Atención ${r.atencion}/5` : ""
+            }</p>
+            <p class="item-date">${formatDate(r.receivedAt || r.timestamp)}</p>
+          </div>
+        </button>
+        <div class="item-actions">
+          <button type="button" class="btn btn-soft" data-open="${escapeHtml(r.id)}">Ver</button>
+          <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV</button>
+        </div>
+      </li>
+    `;
+  }
+
+  function renderBoard() {
+    const list = filtered();
+    liveCount.textContent = String(items.length);
+    groupCount.textContent = `${list.length}`;
+    groupTitle.textContent = list.length === 1 ? "Respuesta" : "Respuestas";
+    renderMetrics(list);
+
+    boardEl.className = `board board-${view === "list" ? "list" : "grid"}`;
+
+    if (!list.length) {
+      boardEl.innerHTML = "";
+      emptyEl.hidden = false;
+      emptyEl.querySelector("h2").textContent = items.length
+        ? "Sin coincidencias"
+        : "Sin respuestas aún";
+      emptyEl.querySelector("p").textContent = items.length
+        ? "Prueba limpiar filtros o cambiar la búsqueda."
+        : "Cuando alguien complete la encuesta, aparecerá aquí en tiempo real.";
+      return;
+    }
+
+    emptyEl.hidden = true;
+    boardEl.innerHTML = list.map((r, i) => cardHtml(r, i)).join("");
+  }
+
+  function findById(id) {
+    return items.find((r) => r.id === id);
+  }
+
+  function openModal(id) {
+    const r = findById(id);
+    if (!r) return;
+    const lvl = level(r.experiencia);
+    modalHero.innerHTML = `
+      <span class="badge ${lvl.cls}">${lvl.label}</span>
+      <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
+      <p>${formatDate(r.receivedAt || r.timestamp)} · ${emojiFor(r)} ${escapeHtml(
+        r.satisfaccion || ""
+      )}</p>
+    `;
+    modalBody.innerHTML = Object.keys(LABELS)
+      .map((key) => {
+        const val = r[key];
+        if (val == null || String(val).trim() === "") return "";
+        return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
+      })
+      .join("");
+    modalActions.innerHTML = `
+      <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV de esta respuesta</button>
+      <a class="btn btn-soft" href="./api/export.xlsx">Excel completo</a>
+    `;
+    if (typeof modal.showModal === "function") modal.showModal();
+    else modal.setAttribute("open", "");
+  }
+
+  function downloadCsvOne(id) {
+    const r = findById(id);
+    if (!r) return;
+    const headers = ["#", ...Object.values(LABELS), "Fecha", "ID"];
+    const values = [
+      "1",
+      ...Object.keys(LABELS).map((k) => String(r[k] ?? "")),
+      formatDate(r.receivedAt || r.timestamp),
+      r.id || "",
+    ];
+    const esc = (v) => {
+      const s = String(v ?? "");
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = "\uFEFF" + [headers.map(esc).join(","), values.map(esc).join(",")].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Respuesta_${r.clave || r.id || "encuesta"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearFilters() {
+    qEl.value = "";
+    fSatisfaccion.value = "";
+    fRecomienda.value = "";
+    fExperiencia.value = "";
+    desdeEl.value = "";
+    hastaEl.value = "";
+    ordenEl.value = "fecha-desc";
+    renderBoard();
+  }
+
   async function load() {
     try {
       const res = await fetch("/api/responses", { cache: "no-store" });
       const data = await res.json();
       items = Array.isArray(data.responses) ? data.responses : [];
-      if (index >= items.length) index = 0;
-      liveStatus.textContent = `En vivo · ${items.length} respuesta${items.length === 1 ? "" : "s"}`;
-      renderStats();
-      renderDetail();
+      lastSync = new Date().toISOString();
+      fillSatisfaccionOptions(items);
+      renderBoard();
     } catch (_) {
-      liveStatus.textContent = "Sin conexión";
+      liveCount.textContent = "!";
     }
   }
+
+  boardEl.addEventListener("click", (e) => {
+    const openBtn = e.target.closest("[data-open]");
+    const csvBtn = e.target.closest("[data-csv]");
+    if (csvBtn) {
+      e.preventDefault();
+      downloadCsvOne(csvBtn.getAttribute("data-csv"));
+      return;
+    }
+    if (openBtn) {
+      e.preventDefault();
+      openModal(openBtn.getAttribute("data-open"));
+    }
+  });
+
+  modalActions.addEventListener("click", (e) => {
+    const csvBtn = e.target.closest("[data-csv]");
+    if (csvBtn) downloadCsvOne(csvBtn.getAttribute("data-csv"));
+  });
+
+  document.getElementById("modalClose").addEventListener("click", () => {
+    if (typeof modal.close === "function") modal.close();
+    else modal.removeAttribute("open");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      if (typeof modal.close === "function") modal.close();
+      else modal.removeAttribute("open");
+    }
+  });
+
+  document.getElementById("btnRefresh").addEventListener("click", load);
+  document.getElementById("btnClear").addEventListener("click", clearFilters);
+
+  [qEl, fSatisfaccion, fRecomienda, fExperiencia, desdeEl, hastaEl, ordenEl].forEach((el) => {
+    el.addEventListener("input", renderBoard);
+    el.addEventListener("change", renderBoard);
+  });
+
+  document.getElementById("viewGrid").addEventListener("click", () => {
+    view = "grid";
+    document.getElementById("viewGrid").classList.add("on");
+    document.getElementById("viewList").classList.remove("on");
+    renderBoard();
+  });
+
+  document.getElementById("viewList").addEventListener("click", () => {
+    view = "list";
+    document.getElementById("viewList").classList.add("on");
+    document.getElementById("viewGrid").classList.remove("on");
+    renderBoard();
+  });
 
   load();
   setInterval(load, 4000);
