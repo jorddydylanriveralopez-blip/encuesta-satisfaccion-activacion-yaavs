@@ -1,0 +1,77 @@
+name: List Hostinger websites (temp)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List websites (domains only)
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ secrets.HOSTINGER_USERNAME }}
+        run: |
+          node <<'NODE'
+          const TOKEN = process.env.HOSTINGER_API_TOKEN;
+          const USERNAME = process.env.HOSTINGER_USERNAME || 'u376360150';
+          if (!TOKEN) throw new Error('HOSTINGER_API_TOKEN missing');
+          console.log('token_present', true, 'token_len', TOKEN.length, 'username', USERNAME);
+          const BASE = 'https://developers.hostinger.com';
+          const headers = {
+            Authorization: `Bearer ${TOKEN}`,
+            Accept: 'application/json',
+            'User-Agent': 'gh-actions-list-sites/1.0',
+          };
+          const known = [
+            'coral-oryx-137304.hostingersite.com',
+            'dodgerblue-zebra-542971.hostingersite.com',
+            'gray-manatee-704328.hostingersite.com',
+            'grey-ram-535914.hostingersite.com',
+            'lawngreen-guanaco-656732.hostingersite.com',
+            'lightslategrey-deer-478072.hostingersite.com',
+          ];
+          const urls = [
+            `${BASE}/api/hosting/v1/accounts/${USERNAME}/websites`,
+            `${BASE}/api/hosting/v1/websites`,
+            `${BASE}/api/domains/v1/portfolio`,
+            `${BASE}/api/hosting/v1/billing/subscriptions`,
+            `${BASE}/api/hosting/v1/accounts/${USERNAME}`,
+          ];
+          for (const d of known) {
+            urls.push(`${BASE}/api/hosting/v1/accounts/${USERNAME}/websites/${d}`);
+            urls.push(`${BASE}/api/hosting/v1/accounts/${USERNAME}/websites/${d}/nodejs/builds?per_page=1`);
+          }
+          // Also try create-related discovery endpoints
+          urls.push(`${BASE}/api/hosting/v1/accounts/${USERNAME}/websites?per_page=100`);
+          urls.push(`${BASE}/api/hosting/v1/reach/websites`);
+          function walk(o, found = []) {
+            if (o && typeof o === 'object') {
+              if (Array.isArray(o)) o.forEach((x) => walk(x, found));
+              else {
+                for (const [k, v] of Object.entries(o)) {
+                  if (typeof v === 'string' && v.includes('hostingersite.com')) found.push(v);
+                  else if (typeof v === 'string' && (k.toLowerCase().includes('domain') || k === 'vhost' || k === 'hostname') && v.includes('.')) found.push(v);
+                  walk(v, found);
+                }
+              }
+            }
+            return found;
+          }
+          (async () => {
+            for (const url of urls) {
+              try {
+                const res = await fetch(url, { headers });
+                const text = await res.text();
+                let domains = [];
+                try { domains = walk(JSON.parse(text)); } catch {}
+                console.log('STATUS', res.status, url);
+                console.log('DOMAINS_OR_FIELDS', [...new Set(domains)].slice(0, 80));
+                console.log('BODY_SNIP', text.slice(0, 800).replaceAll(TOKEN, '***'));
+                console.log('---');
+              } catch (e) {
+                console.log('ERR', url, e.message);
+              }
+            }
+          })();
+          NODE
