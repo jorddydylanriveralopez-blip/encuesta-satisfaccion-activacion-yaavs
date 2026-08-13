@@ -256,10 +256,12 @@ jobs:
           NODE
 
       - name: Restore live responses
+        if: always()
         env:
           HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
           RESET_KEY: ${{ secrets.RESET_KEY }}
         run: |
+          if [ ! -f responses-live.json ]; then echo "no backup file"; exit 0; fi
           DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
           export HOSTINGER_DOMAIN="$DOMAIN"
           export RESET_KEY="${RESET_KEY:-yaavs-reset}"
