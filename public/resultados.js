@@ -29,6 +29,7 @@
     satisfaccion: null,
     recomienda: null,
     experiencia: null,
+    ventas: null,
   };
 
   const PIE_COLORS = [
@@ -44,6 +45,12 @@
 
   const LABELS = {
     clave: "Clave YAAVSER",
+    ventasTipos: "Ventas BTL",
+    ventasEsim: "eSIM",
+    ventasSim: "SIM",
+    ventasPortabilidad: "Portabilidad",
+    ventasDescargas: "Descargas nuevas",
+    ventasTotal: "Total ventas",
     experiencia: "Experiencia general",
     satisfaccion: "Satisfacción",
     gusto: "Lo que más gustó",
@@ -143,6 +150,7 @@
           r.recomienda,
           r.mejoras,
           r.comentarios,
+          r.ventasTipos,
           r.id,
         ]
           .join(" ")
@@ -169,12 +177,13 @@
 
   function renderMetrics(list) {
     const recommendYes = list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length;
+    const ventas = list.reduce((acc, r) => acc + (Number(r.ventasTotal) || 0), 0);
     metricsEl.innerHTML = `
       <div class="metric"><span>Total</span><strong>${list.length}</strong></div>
       <div class="metric"><span>Exp. promedio</span><strong>${avg(list, "experiencia")}</strong></div>
       <div class="metric"><span>Atención</span><strong>${avg(list, "atencion")}</strong></div>
       <div class="metric"><span>Recomiendan</span><strong>${recommendYes}</strong></div>
-      <div class="metric"><span>Viendo</span><strong>${list.length}</strong></div>
+      <div class="metric"><span>Ventas BTL</span><strong>${ventas}</strong></div>
       <div class="metric metric-time"><span>Última sync</span><strong>${
         lastSync ? formatTime(lastSync) : "—"
       }</strong></div>
@@ -281,14 +290,24 @@
     const rec = tally(list, "recomienda", recOrder);
     const exp = tally(list, "experiencia", expOrder);
     exp.labels = exp.labels.map((n) => `${n}/5`);
+    const ventas = {
+      labels: ["eSIM", "SIM", "Portabilidad", "Descargas nuevas"],
+      values: [
+        list.reduce((a, r) => a + (Number(r.ventasEsim) || 0), 0),
+        list.reduce((a, r) => a + (Number(r.ventasSim) || 0), 0),
+        list.reduce((a, r) => a + (Number(r.ventasPortabilidad) || 0), 0),
+        list.reduce((a, r) => a + (Number(r.ventasDescargas) || 0), 0),
+      ],
+    };
 
-    const chartsKey = JSON.stringify({ sat, rec, exp });
+    const chartsKey = JSON.stringify({ sat, rec, exp, ventas });
     if (chartsKey === lastChartsKey) return;
     lastChartsKey = chartsKey;
 
     upsertPie("satisfaccion", "chartSatisfaccion", "emptySatisfaccion", sat.labels, sat.values);
     upsertPie("recomienda", "chartRecomienda", "emptyRecomienda", rec.labels, rec.values);
     upsertPie("experiencia", "chartExperiencia", "emptyExperiencia", exp.labels, exp.values);
+    upsertPie("ventas", "chartVentas", "emptyVentas", ventas.labels, ventas.values);
   }
 
   function cardHtml(r, i) {
@@ -312,6 +331,8 @@
             )}</p>
             <p class="item-meta">${escapeHtml(r.recomienda ? `Recomienda: ${r.recomienda}` : "")}${
               r.atencion ? ` · Atención ${r.atencion}/5` : ""
+            }${
+              r.ventasTotal ? ` · Ventas ${r.ventasTotal}` : ""
             }</p>
             <p class="item-date">${formatDate(r.receivedAt || r.timestamp)}</p>
           </div>
@@ -400,6 +421,14 @@
       .map((key) => {
         const val = r[key];
         if (val == null || String(val).trim() === "") return "";
+        if (
+          ["ventasEsim", "ventasSim", "ventasPortabilidad", "ventasDescargas", "ventasTotal"].includes(
+            key
+          ) &&
+          Number(val) === 0
+        ) {
+          return "";
+        }
         return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
       })
       .join("");

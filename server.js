@@ -36,6 +36,12 @@ const SHEETS_WEBHOOK_URL = String(process.env.SHEETS_WEBHOOK_URL || "").trim();
 const FIELD_ORDER = [
   ["clave", "Clave YAAVSER"],
   ["receivedAt", "Fecha y hora"],
+  ["ventasTipos", "Ventas BTL (tipos)"],
+  ["ventasEsim", "eSIM vendidas"],
+  ["ventasSim", "SIM vendidas"],
+  ["ventasPortabilidad", "Portabilidad"],
+  ["ventasDescargas", "Descargas nuevas"],
+  ["ventasTotal", "Total ventas BTL"],
   ["experiencia", "Experiencia (1-5)"],
   ["satisfaccion", "Satisfacción"],
   ["gusto", "Lo que más gustó"],
@@ -51,6 +57,12 @@ const FIELD_ORDER = [
 const COLUMN_WIDTHS = {
   clave: 16,
   receivedAt: 20,
+  ventasTipos: 28,
+  ventasEsim: 14,
+  ventasSim: 14,
+  ventasPortabilidad: 14,
+  ventasDescargas: 16,
+  ventasTotal: 16,
   experiencia: 16,
   satisfaccion: 22,
   gusto: 26,
@@ -92,6 +104,14 @@ function writeResponses(list) {
   fs.writeFileSync(dataFile, JSON.stringify(list, null, 2), "utf8");
 }
 
+const QTY_KEYS = ["ventasEsim", "ventasSim", "ventasPortabilidad", "ventasDescargas"];
+
+function clampSaleQty(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return Math.max(0, Math.min(25, Math.round(n)));
+}
+
 function flatten(entry) {
   const a = entry.answers && typeof entry.answers === "object" ? entry.answers : {};
   const out = {
@@ -106,6 +126,8 @@ function flatten(entry) {
     else if (v == null) out[key] = "";
     else out[key] = String(v);
   }
+  const total = QTY_KEYS.reduce((sum, key) => sum + (Number(a[key]) || 0), 0);
+  out.ventasTotal = String(a.ventasTotal != null && a.ventasTotal !== "" ? a.ventasTotal : total);
   return out;
 }
 
@@ -114,6 +136,14 @@ function normalize(body) {
   const answers = body && typeof body.answers === "object" ? body.answers : body || {};
   const clean = { ...answers };
   delete clean.website;
+  if (Array.isArray(clean.ventasTipos)) {
+    clean.ventasTipos = clean.ventasTipos.map((v) => String(v || "").trim()).filter(Boolean);
+  }
+  QTY_KEYS.forEach((key) => {
+    if (clean[key] == null || clean[key] === "") return;
+    clean[key] = clampSaleQty(clean[key]);
+  });
+  clean.ventasTotal = QTY_KEYS.reduce((sum, key) => sum + (Number(clean[key]) || 0), 0);
   return {
     id: body?.id || `sat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     receivedAt: body?.receivedAt || body?.timestamp || now,
@@ -222,9 +252,9 @@ async function buildWorkbook(items) {
       idx + 1,
       ...keys.map((k) => {
         if (k === "receivedAt") return formatDateMx(row.receivedAt || row.timestamp);
-        if (k === "experiencia" || k === "atencion") {
+        if (k === "experiencia" || k === "atencion" || QTY_KEYS.includes(k) || k === "ventasTotal") {
           const n = Number(row[k]);
-          return Number.isFinite(n) && n > 0 ? n : "";
+          return Number.isFinite(n) && n >= 0 ? n : "";
         }
         const v = row[k];
         return v == null || String(v).trim() === "" ? "" : String(v).trim();
@@ -238,8 +268,8 @@ async function buildWorkbook(items) {
       cell.font = { name: "Calibri", size: 11, color: { argb: INK } };
       cell.alignment = {
         vertical: "middle",
-        horizontal: colNumber <= 3 || colNumber === 8 || colNumber === 11 ? "center" : "left",
-        wrapText: colNumber >= 12,
+        horizontal: colNumber <= 3 || colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 8 || colNumber === 9 ? "center" : "left",
+        wrapText: colNumber >= 17,
       };
       cell.border = {
         top: { style: "thin", color: { argb: LINE } },
@@ -305,6 +335,13 @@ async function buildWorkbook(items) {
     "",
     "",
   ]);
+  const sumKey = (key) =>
+    items.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+  summary.addRow(["Total eSIM", sumKey("ventasEsim"), "", ""]);
+  summary.addRow(["Total SIM", sumKey("ventasSim"), "", ""]);
+  summary.addRow(["Total portabilidad", sumKey("ventasPortabilidad"), "", ""]);
+  summary.addRow(["Total descargas nuevas", sumKey("ventasDescargas"), "", ""]);
+  summary.addRow(["Total ventas BTL", sumKey("ventasTotal"), "", ""]);
 
   const distBlock = (title, key) => {
     summary.addRow([]);

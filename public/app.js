@@ -14,6 +14,18 @@
       required: true,
     },
     {
+      id: "ventasTipos",
+      type: "sales",
+      title: "¿Cuántas ventas obtuviste durante la vinculación BTL?",
+      hint: "Elige lo que vendiste. Al seleccionarlo puedes anotar la cantidad (máximo 25).",
+      options: [
+        { label: "eSIM", qtyKey: "ventasEsim" },
+        { label: "SIM", qtyKey: "ventasSim" },
+        { label: "Portabilidad", qtyKey: "ventasPortabilidad" },
+        { label: "Descargas nuevas", qtyKey: "ventasDescargas" },
+      ],
+    },
+    {
       id: "experiencia",
       type: "stars",
       title: "¿Cómo calificarías tu experiencia general con la activación?",
@@ -138,6 +150,15 @@
       if (!step.required) return true;
       return String(state.answers[step.id] || "").trim().length > 0;
     }
+    if (step.type === "sales") {
+      const selected = Array.isArray(state.answers.ventasTipos) ? state.answers.ventasTipos : [];
+      if (!selected.length) return false;
+      return step.options.every((opt) => {
+        if (!selected.includes(opt.label)) return true;
+        const n = Number(state.answers[opt.qtyKey]);
+        return Number.isInteger(n) && n >= 1 && n <= 25;
+      });
+    }
     const val = state.answers[step.id];
     if (!val) return false;
     if (step.otherKey && val === "Otro") {
@@ -148,6 +169,36 @@
 
   function selectValue(key, value) {
     state.answers[key] = value;
+    render();
+  }
+
+  function selectedSales() {
+    return Array.isArray(state.answers.ventasTipos) ? [...state.answers.ventasTipos] : [];
+  }
+
+  function clampQty(raw) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return "";
+    return Math.max(1, Math.min(25, Math.round(n)));
+  }
+
+  function toggleSale(label, qtyKey) {
+    const selected = selectedSales();
+    const i = selected.indexOf(label);
+    if (i >= 0) {
+      selected.splice(i, 1);
+      delete state.answers[qtyKey];
+    } else {
+      selected.push(label);
+      if (!state.answers[qtyKey]) state.answers[qtyKey] = 1;
+    }
+    state.answers.ventasTipos = selected;
+    render();
+  }
+
+  function bumpQty(qtyKey, delta) {
+    const current = Number(state.answers[qtyKey]) || 1;
+    state.answers[qtyKey] = clampQty(current + delta);
     render();
   }
 
@@ -325,12 +376,57 @@
     `;
   }
 
+  function renderSales(step) {
+    const selected = selectedSales();
+    return `
+      <p class="field-hint sales-hint">${escapeHtml(step.hint || "")}</p>
+      <div class="sales-list">
+        ${step.options
+          .map((opt) => {
+            const on = selected.includes(opt.label);
+            const qty = state.answers[opt.qtyKey] ?? "";
+            return `
+              <div class="sale-card ${on ? "is-selected" : ""}">
+                <button type="button" class="sale-toggle" data-sale="${escapeHtml(
+                  opt.label
+                )}" data-qty-key="${opt.qtyKey}" aria-pressed="${on}">
+                  <span class="sale-check" aria-hidden="true">${on ? "✓" : ""}</span>
+                  <span>${escapeHtml(opt.label)}</span>
+                </button>
+                ${
+                  on
+                    ? `<div class="sale-qty">
+                        <label for="qty-${opt.qtyKey}">¿Cuántas vendiste?</label>
+                        <div class="qty-row">
+                          <button type="button" class="qty-btn" data-qty-step="-1" data-qty-key="${
+                            opt.qtyKey
+                          }" aria-label="Menos">−</button>
+                          <input id="qty-${opt.qtyKey}" data-qty="${opt.qtyKey}" type="number"
+                            inputmode="numeric" min="1" max="25" step="1"
+                            value="${escapeHtml(qty)}" placeholder="1–25" />
+                          <button type="button" class="qty-btn" data-qty-step="1" data-qty-key="${
+                            opt.qtyKey
+                          }" aria-label="Más">+</button>
+                        </div>
+                        <span class="qty-cap">Máximo 25</span>
+                      </div>`
+                    : ""
+                }
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   function renderQuestion(step) {
     let body = "";
     if (step.type === "stars") body = renderStars(step);
     else if (step.type === "emoji") body = renderEmoji(step);
     else if (step.type === "choice") body = renderChoice(step);
     else if (step.type === "text" || step.type === "input") body = renderText(step);
+    else if (step.type === "sales") body = renderSales(step);
 
     const isLast = state.step === STEPS.length - 1;
     return `
@@ -374,7 +470,7 @@
   }
 
   app.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-action], [data-key]");
+    const btn = e.target.closest("[data-action], [data-key], [data-sale], [data-qty-step]");
     if (!btn) return;
     const action = btn.getAttribute("data-action");
     if (action === "start") {
@@ -387,6 +483,16 @@
     }
     if (action === "next") {
       next();
+      return;
+    }
+    const sale = btn.getAttribute("data-sale");
+    if (sale) {
+      toggleSale(sale, btn.getAttribute("data-qty-key"));
+      return;
+    }
+    const stepDelta = btn.getAttribute("data-qty-step");
+    if (stepDelta) {
+      bumpQty(btn.getAttribute("data-qty-key"), Number(stepDelta));
       return;
     }
     const key = btn.getAttribute("data-key");
@@ -403,6 +509,22 @@
     }
     if (t.matches("[data-other]")) {
       state.answers[t.getAttribute("data-other")] = t.value;
+      const primary = app.querySelector('[data-action="next"]');
+      if (primary) primary.disabled = !canContinue() || state.submitting;
+    }
+    if (t.matches("[data-qty]")) {
+      const key = t.getAttribute("data-qty");
+      const raw = String(t.value || "").trim();
+      if (raw === "") {
+        state.answers[key] = "";
+      } else {
+        const n = Number(raw);
+        if (Number.isFinite(n)) {
+          const clamped = Math.max(1, Math.min(25, Math.round(n)));
+          state.answers[key] = clamped;
+          if (String(clamped) !== raw) t.value = String(clamped);
+        }
+      }
       const primary = app.querySelector('[data-action="next"]');
       if (primary) primary.disabled = !canContinue() || state.submitting;
     }

@@ -375,11 +375,128 @@ h1,
   color: var(--muted);
 }
 
-.field-hint {
-  margin: 0;
-  font-size: 0.85rem;
+.sales-hint {
+  margin: -4px 0 14px;
+}
+
+.sales-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sale-card {
+  border: 1px solid var(--line);
+  background: #f8fbfe;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.sale-card.is-selected {
+  border-color: rgba(37, 99, 181, 0.55);
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(37, 99, 181, 0.12);
+}
+
+.sale-toggle {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  min-height: 52px;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.sale-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  color: #fff;
+  flex: none;
+}
+
+.sale-card.is-selected .sale-check {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.sale-qty {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
+.sale-qty label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.qty-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  gap: 8px;
+  align-items: center;
+}
+
+.qty-btn {
+  appearance: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f8fbfe;
+  color: var(--navy);
+  font: inherit;
+  font-size: 1.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.qty-btn:hover {
+  background: #fff;
+  border-color: rgba(37, 99, 181, 0.35);
+}
+
+.qty-row input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: center;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--navy);
+  background: #fff;
+}
+
+.qty-row input:focus {
+  outline: none;
+  border-color: rgba(37, 99, 181, 0.55);
+  box-shadow: 0 0 0 3px rgba(37, 99, 181, 0.12);
+}
+
+.qty-cap {
+  font-size: 0.78rem;
   color: var(--soft);
-  line-height: 1.4;
 }
 
 .field input,
