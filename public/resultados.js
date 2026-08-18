@@ -21,6 +21,14 @@
   let view = "grid";
   let lastSync = null;
   let optionsFilled = false;
+  const SALES_PRODUCTS = [
+    { key: "ventasEsim", label: "eSIM" },
+    { key: "ventasSim", label: "SIM" },
+    { key: "ventasPortabilidad", label: "Portabilidad" },
+    { key: "ventasDescargas", label: "Descargas nuevas" },
+  ];
+
+  let lastSalesKey = "";
   let lastBoardKey = "";
   let lastMetricsKey = "";
   let lastChartsKey = "";
@@ -258,6 +266,19 @@
               padding: 12,
               color: "#3d5568",
               font: { family: "Outfit", size: 11, weight: "600" },
+              generateLabels(chart) {
+                const data = chart.data;
+                const ds = data.datasets[0] || {};
+                const values = ds.data || [];
+                return (data.labels || []).map((label, i) => ({
+                  text: `${label} · ${values[i] || 0}`,
+                  fillStyle: (ds.backgroundColor || [])[i],
+                  strokeStyle: "#fff",
+                  lineWidth: 1,
+                  hidden: false,
+                  index: i,
+                }));
+              },
             },
           },
           tooltip: {
@@ -310,6 +331,67 @@
     upsertPie("ventas", "chartVentas", "emptyVentas", ventas.labels, ventas.values);
   }
 
+  function salesSummary(list) {
+    const rows = SALES_PRODUCTS.map((p) => {
+      let vendidas = 0;
+      let encuestas = 0;
+      list.forEach((r) => {
+        const n = Number(r[p.key]) || 0;
+        vendidas += n;
+        if (n > 0) encuestas += 1;
+      });
+      return { ...p, vendidas, encuestas };
+    });
+    const total = rows.reduce((acc, row) => acc + row.vendidas, 0);
+    return { rows, total };
+  }
+
+  function salesLine(r) {
+    return SALES_PRODUCTS.map((p) => {
+      const n = Number(r[p.key]) || 0;
+      return n > 0 ? `${p.label} ${n}` : "";
+    })
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function renderSalesBtl(list) {
+    const kpis = document.getElementById("salesBtlKpis");
+    const body = document.getElementById("salesBtlBody");
+    const foot = document.getElementById("salesBtlFoot");
+    if (!kpis || !body || !foot) return;
+
+    const data = salesSummary(list);
+    const key = JSON.stringify(data);
+    if (key === lastSalesKey) return;
+    lastSalesKey = key;
+
+    kpis.innerHTML = data.rows
+      .map(
+        (row) =>
+          `<div class="sales-kpi"><span>${escapeHtml(row.label)}</span><strong>${row.vendidas}</strong></div>`
+      )
+      .join("") +
+      `<div class="sales-kpi sales-kpi-total"><span>Total</span><strong>${data.total}</strong></div>`;
+
+    body.innerHTML = data.rows
+      .map(
+        (row) => `
+      <tr>
+        <td>${escapeHtml(row.label)}</td>
+        <td class="num"><strong>${row.vendidas}</strong></td>
+        <td class="num">${row.encuestas}</td>
+      </tr>`
+      )
+      .join("");
+    foot.innerHTML = `
+      <tr>
+        <td>Total</td>
+        <td class="num">${data.total}</td>
+        <td class="num">${list.filter((r) => (Number(r.ventasTotal) || 0) > 0).length}</td>
+      </tr>`;
+  }
+
   function cardHtml(r, i) {
     const lvl = level(r.experiencia);
     const animClass = animateCards ? "item item-enter" : "item";
@@ -332,7 +414,7 @@
             <p class="item-meta">${escapeHtml(r.recomienda ? `Recomienda: ${r.recomienda}` : "")}${
               r.atencion ? ` · Atención ${r.atencion}/5` : ""
             }${
-              r.ventasTotal ? ` · Ventas ${r.ventasTotal}` : ""
+              salesLine(r) ? ` · ${salesLine(r)}` : r.ventasTotal ? ` · Ventas ${r.ventasTotal}` : ""
             }</p>
             <p class="item-date">${formatDate(r.receivedAt || r.timestamp)}</p>
           </div>
@@ -352,11 +434,14 @@
   }
 
   function metricsKey(list) {
+    const sales = salesSummary(list);
     return [
       list.length,
       avg(list, "experiencia"),
       avg(list, "atencion"),
       list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length,
+      sales.total,
+      sales.rows.map((r) => r.vendidas).join(","),
       formatTime(lastSync),
     ].join("|");
   }
@@ -377,6 +462,7 @@
     }
 
     renderCharts(list);
+    renderSalesBtl(list);
 
     const bKey = boardKey(list);
     if (!forceCards && bKey === lastBoardKey) return;
@@ -417,21 +503,33 @@
         r.satisfaccion || ""
       )}</p>
     `;
-    modalBody.innerHTML = Object.keys(LABELS)
-      .map((key) => {
-        const val = r[key];
-        if (val == null || String(val).trim() === "") return "";
-        if (
-          ["ventasEsim", "ventasSim", "ventasPortabilidad", "ventasDescargas", "ventasTotal"].includes(
-            key
-          ) &&
-          Number(val) === 0
-        ) {
-          return "";
-        }
-        return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
-      })
-      .join("");
+    const sales = salesLine(r);
+    const salesTotal = Number(r.ventasTotal) || 0;
+    modalBody.innerHTML =
+      (sales || salesTotal
+        ? `<div class="modal-row"><b>Ventas BTL</b><span>${escapeHtml(
+            sales || `${salesTotal}`
+          )}${salesTotal ? ` · Total ${salesTotal}` : ""}</span></div>`
+        : "") +
+      Object.keys(LABELS)
+        .map((key) => {
+          const val = r[key];
+          if (val == null || String(val).trim() === "") return "";
+          if (
+            [
+              "ventasTipos",
+              "ventasEsim",
+              "ventasSim",
+              "ventasPortabilidad",
+              "ventasDescargas",
+              "ventasTotal",
+            ].includes(key)
+          ) {
+            return "";
+          }
+          return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
+        })
+        .join("");
     modalActions.innerHTML = `
       <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV de esta respuesta</button>
       <a class="btn btn-soft" href="./api/descargar-excel" data-excel>Excel completo</a>
@@ -491,6 +589,7 @@
         lastBoardKey = "";
         lastChartsKey = "";
         lastMetricsKey = "";
+        lastSalesKey = "";
       }
       renderBoard();
     } catch (_) {
@@ -568,12 +667,14 @@
       lastBoardKey = "";
       lastChartsKey = "";
       lastMetricsKey = "";
+      lastSalesKey = "";
       renderBoard(true);
     });
     el.addEventListener("change", () => {
       lastBoardKey = "";
       lastChartsKey = "";
       lastMetricsKey = "";
+      lastSalesKey = "";
       renderBoard(true);
     });
   });

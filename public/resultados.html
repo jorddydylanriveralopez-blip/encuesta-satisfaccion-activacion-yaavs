@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./resultados.css?v=20260818a" />
+    <link rel="stylesheet" href="./resultados.css?v=20260818b" />
   </head>
   <body>
     <div class="shell">
@@ -86,8 +86,31 @@
               <div class="chart-wrap">
                 <canvas id="chartVentas" aria-label="Pastel de ventas BTL"></canvas>
               </div>
-              <p class="chart-empty" id="emptyVentas" hidden>Sin datos</p>
+              <p class="chart-empty" id="emptyVentas" hidden>Sin ventas BTL aún</p>
             </article>
+          </div>
+        </section>
+
+        <section class="sales-btl" aria-label="Ventas durante la vinculación BTL">
+          <div class="sales-btl-head">
+            <div>
+              <h2>Ventas durante la vinculación BTL</h2>
+              <p>Suma de eSIM, SIM, portabilidad y descargas nuevas según los filtros.</p>
+            </div>
+          </div>
+          <div class="sales-btl-kpis" id="salesBtlKpis"></div>
+          <div class="sales-btl-table-wrap">
+            <table class="sales-btl-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="num">Vendidas</th>
+                  <th class="num">Encuestas</th>
+                </tr>
+              </thead>
+              <tbody id="salesBtlBody"></tbody>
+              <tfoot id="salesBtlFoot"></tfoot>
+            </table>
           </div>
         </section>
 
@@ -177,6 +200,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="./resultados.js?v=20260818a" defer></script>
+    <script src="./resultados.js?v=20260818b" defer></script>
   </body>
 </html>

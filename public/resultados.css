@@ -324,6 +324,107 @@ a {
   font-weight: 600;
 }
 
+.sales-btl {
+  margin-top: 1.25rem;
+  padding: 1.1rem 1.05rem 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 18px;
+  outline: 1px solid rgba(7, 24, 36, 0.06);
+  box-shadow: 0 14px 40px rgba(7, 40, 60, 0.08);
+  animation: rise 0.66s ease both;
+}
+
+.sales-btl-head h2 {
+  margin: 0 0 0.2rem;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+}
+
+.sales-btl-head p {
+  margin: 0 0 0.95rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.sales-btl-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.95rem;
+}
+
+.sales-kpi {
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  background: #f3f8fb;
+  border: 1px solid rgba(0, 43, 68, 0.06);
+}
+
+.sales-kpi span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sales-kpi strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 1.25rem;
+  color: var(--navy);
+  letter-spacing: -0.03em;
+}
+
+.sales-kpi-total {
+  background: #e8f6fb;
+}
+
+.sales-btl-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.sales-btl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.sales-btl-table th,
+.sales-btl-table td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.sales-btl-table th {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sales-btl-table td.num,
+.sales-btl-table th.num,
+.sales-btl-table tfoot td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-btl-table tfoot td {
+  border-bottom: 0;
+  font-weight: 800;
+  color: var(--navy);
+  padding-top: 0.75rem;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: 1.5fr repeat(5, minmax(0, 0.85fr)) auto;
@@ -827,6 +928,10 @@ a {
 @media (max-width: 1100px) {
   .charts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sales-btl-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .toolbar {
