@@ -214,14 +214,15 @@ jobs:
                   print("import failed", e)
                   time.sleep(3)
           print("WARN: could not restore via /api/import")
+          PY2
 
       - name: Restore trade responses
         if: always()
         env:
           HOSTINGER_DOMAIN: lightslategrey-deer-478072.hostingersite.com
         run: |
-          python3 <<'PY'
-          import json, os, time, urllib.error, urllib.request
+          python3 <<'PY3'
+          import json, os, time, urllib.request
           domain = os.environ.get("HOSTINGER_DOMAIN", "lightslategrey-deer-478072.hostingersite.com")
           if not os.path.exists("trade-responses-live.json"):
               print("no trade backup")
@@ -244,11 +245,10 @@ jobs:
                       body = res.read().decode()
                       print("trade import", res.status, body[:400])
                       raise SystemExit(0)
+              except SystemExit:
+                  raise
               except Exception as e:
                   print("trade import failed", e)
                   time.sleep(min(2 ** attempt, 20))
           print("WARN: could not restore trade via /api/trade/import")
-          PY
-          raise SystemExit(1)
-          PY2
-
+          PY3
