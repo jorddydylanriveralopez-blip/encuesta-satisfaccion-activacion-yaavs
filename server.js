@@ -32,31 +32,84 @@ const dataDir = path.join(__dirname, "data");
 const dataFile = path.join(dataDir, "responses.json");
 const SHEETS_WEBHOOK_URL = String(process.env.SHEETS_WEBHOOK_URL || "").trim();
 
-// Orden claro para leer el Excel de izquierda a derecha
+// Orden claro para leer el Excel (incluye campos 2.2 + legacy v1)
 const FIELD_ORDER = [
   ["clave", "Clave YAAVSER"],
-  ["receivedAt", "Fecha y hora"],
-  ["ventasTipos", "Ventas BTL (tipos)"],
-  ["ventasEsim", "eSIM vendidas"],
-  ["ventasSim", "SIM vendidas"],
-  ["ventasPortabilidad", "Portabilidad"],
-  ["ventasDescargas", "Descargas nuevas"],
-  ["ventasTotal", "Total ventas BTL"],
-  ["experiencia", "Experiencia (1-5)"],
-  ["satisfaccion", "Satisfacción"],
-  ["gusto", "Lo que más gustó"],
-  ["gustoOtro", "Gusto (otro)"],
-  ["atencion", "Atención del equipo (1-5)"],
-  ["expectativas", "Expectativas"],
-  ["interesYaavs", "Interés en YAAVS"],
+  ["nombre", "Nombre YAAVSER"],
+  ["fecha", "Fecha encuesta"],
+  ["municipio", "Municipio / Estado"],
+  ["receivedAt", "Fecha y hora envío"],
+  ["surveyVersion", "Versión encuesta"],
+  // v2.2
+  ["ventasDiaChips", "Día normal · Chips/Líneas (1-5)"],
+  ["ventasDiaPortabilidad", "Día normal · Portabilidades (1-5)"],
+  ["ventasDiaEsim", "Día normal · eSIM (1-5)"],
+  ["ventasDiaPospago", "Día normal · Pospago (1-5)"],
+  ["ayudaVisitas", "Ayudó a más visitas (1-5)"],
+  ["ayudaVisitasPorque", "Ayudó visitas · ¿Por qué?"],
+  ["oportunidadesVenta", "¿Generó oportunidades de venta?"],
+  ["productosMasVentas", "Productos con más ventas"],
+  ["ventasActLineaNueva", "Activación · Línea nueva"],
+  ["ventasActPortabilidad", "Activación · Portabilidad"],
+  ["ventasActEsim", "Activación · eSIM"],
+  ["ventasActPospago", "Activación · Pospago"],
+  ["ventasActOtroQty", "Activación · Otro (cant.)"],
+  ["ventasActOtroTexto", "Activación · Otro (texto)"],
+  ["imagenPromotoras", "Imagen promotoras (1-5)"],
+  ["imagenPromotorasPorque", "Imagen promotoras · ¿Por qué?"],
+  ["ejecucion", "Ejecución activación"],
+  ["ejecucionPorque", "Ejecución · ¿Por qué?"],
+  ["horarios", "¿Respetaron horarios?"],
+  ["preferenciaYaavs", "Preferencia YAAVS (1-5)"],
   ["recomienda", "¿Recomendaría?"],
+  ["gusto", "Lo que más gustó"],
   ["mejoras", "Qué mejorarías"],
-  ["comentarios", "Comentarios adicionales"],
+  // legacy v1 (se conservan respuestas anteriores)
+  ["ventasTipos", "Ventas BTL (tipos) [v1]"],
+  ["ventasEsim", "eSIM vendidas [v1]"],
+  ["ventasSim", "SIM vendidas [v1]"],
+  ["ventasPortabilidad", "Portabilidad [v1]"],
+  ["ventasDescargas", "Descargas nuevas [v1]"],
+  ["ventasTotal", "Total ventas BTL [v1]"],
+  ["experiencia", "Experiencia (1-5) [v1]"],
+  ["satisfaccion", "Satisfacción [v1]"],
+  ["gustoOtro", "Gusto (otro) [v1]"],
+  ["atencion", "Atención del equipo (1-5) [v1]"],
+  ["expectativas", "Expectativas [v1]"],
+  ["interesYaavs", "Interés en YAAVS [v1]"],
+  ["comentarios", "Comentarios adicionales [v1]"],
 ];
 
 const COLUMN_WIDTHS = {
   clave: 16,
+  nombre: 22,
+  fecha: 14,
+  municipio: 22,
   receivedAt: 20,
+  surveyVersion: 12,
+  ventasDiaChips: 14,
+  ventasDiaPortabilidad: 14,
+  ventasDiaEsim: 12,
+  ventasDiaPospago: 12,
+  ayudaVisitas: 14,
+  ayudaVisitasPorque: 36,
+  oportunidadesVenta: 16,
+  productosMasVentas: 28,
+  ventasActLineaNueva: 14,
+  ventasActPortabilidad: 14,
+  ventasActEsim: 12,
+  ventasActPospago: 12,
+  ventasActOtroQty: 12,
+  ventasActOtroTexto: 22,
+  imagenPromotoras: 14,
+  imagenPromotorasPorque: 36,
+  ejecucion: 16,
+  ejecucionPorque: 36,
+  horarios: 16,
+  preferenciaYaavs: 14,
+  recomienda: 16,
+  gusto: 36,
+  mejoras: 42,
   ventasTipos: 28,
   ventasEsim: 14,
   ventasSim: 14,
@@ -65,13 +118,10 @@ const COLUMN_WIDTHS = {
   ventasTotal: 16,
   experiencia: 16,
   satisfaccion: 22,
-  gusto: 26,
   gustoOtro: 22,
   atencion: 18,
   expectativas: 22,
   interesYaavs: 26,
-  recomienda: 16,
-  mejoras: 42,
   comentarios: 42,
 };
 
@@ -104,7 +154,15 @@ function writeResponses(list) {
   fs.writeFileSync(dataFile, JSON.stringify(list, null, 2), "utf8");
 }
 
-const QTY_KEYS = ["ventasEsim", "ventasSim", "ventasPortabilidad", "ventasDescargas"];
+const QTY_KEYS_V1 = ["ventasEsim", "ventasSim", "ventasPortabilidad", "ventasDescargas"];
+const QTY_KEYS_V2 = [
+  "ventasActLineaNueva",
+  "ventasActPortabilidad",
+  "ventasActEsim",
+  "ventasActPospago",
+  "ventasActOtroQty",
+];
+const QTY_KEYS = [...QTY_KEYS_V1, ...QTY_KEYS_V2];
 
 function clampSaleQty(v) {
   const n = Number(v);
@@ -126,8 +184,10 @@ function flatten(entry) {
     else if (v == null) out[key] = "";
     else out[key] = String(v);
   }
-  const total = QTY_KEYS.reduce((sum, key) => sum + (Number(a[key]) || 0), 0);
-  out.ventasTotal = String(a.ventasTotal != null && a.ventasTotal !== "" ? a.ventasTotal : total);
+  const totalV1 = QTY_KEYS_V1.reduce((sum, key) => sum + (Number(a[key]) || 0), 0);
+  if (a.ventasTotal != null && a.ventasTotal !== "") out.ventasTotal = String(a.ventasTotal);
+  else if (totalV1 > 0) out.ventasTotal = String(totalV1);
+  else out.ventasTotal = out.ventasTotal || "";
   return out;
 }
 
@@ -139,11 +199,18 @@ function normalize(body) {
   if (Array.isArray(clean.ventasTipos)) {
     clean.ventasTipos = clean.ventasTipos.map((v) => String(v || "").trim()).filter(Boolean);
   }
+  if (Array.isArray(clean.productosMasVentas)) {
+    clean.productosMasVentas = clean.productosMasVentas
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+  }
   QTY_KEYS.forEach((key) => {
     if (clean[key] == null || clean[key] === "") return;
     clean[key] = clampSaleQty(clean[key]);
   });
-  clean.ventasTotal = QTY_KEYS.reduce((sum, key) => sum + (Number(clean[key]) || 0), 0);
+  if (QTY_KEYS_V1.some((k) => clean[k] != null && clean[k] !== "")) {
+    clean.ventasTotal = QTY_KEYS_V1.reduce((sum, key) => sum + (Number(clean[key]) || 0), 0);
+  }
   return {
     id: body?.id || `sat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     receivedAt: body?.receivedAt || body?.timestamp || now,

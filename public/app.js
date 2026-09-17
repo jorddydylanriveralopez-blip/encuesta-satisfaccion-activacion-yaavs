@@ -3,120 +3,139 @@
   const app = document.getElementById("app");
   const toast = document.getElementById("toast");
 
+  const SCALE_1_5 = [
+    { value: "1", label: "1" },
+    { value: "2", label: "2" },
+    { value: "3", label: "3" },
+    { value: "4", label: "4" },
+    { value: "5", label: "5" },
+  ];
+
   const STEPS = [
     { id: "welcome", type: "welcome" },
     {
+      id: "fecha",
+      type: "date",
+      title: "Fecha",
+      required: true,
+    },
+    {
       id: "clave",
       type: "input",
-      title: "¿Cuál es tu clave YAAVSER?",
+      title: "Clave del YAAVSER",
       placeholder: "Escribe tu clave YAAVSER",
       hint: "Con ella identificamos quién contestó la encuesta.",
       required: true,
     },
     {
-      id: "ventasTipos",
+      id: "nombre",
+      type: "input",
+      title: "Nombre del YAAVSER",
+      placeholder: "Nombre completo",
+      required: true,
+    },
+    {
+      id: "municipio",
+      type: "input",
+      title: "Municipio / Estado",
+      placeholder: "Ej. Guadalajara / Jalisco",
+      required: true,
+    },
+    {
+      id: "ventasDia",
+      type: "scaleGroup",
+      title: "En un día normal, aproximadamente ¿cuántos servicios vendes en tu punto de venta?",
+      hint: "Califica de 1 a 5 cada servicio (1 = muy poco, 5 = mucho).",
+      items: [
+        { key: "ventasDiaChips", label: "Chips / Líneas nuevas" },
+        { key: "ventasDiaPortabilidad", label: "Portabilidades" },
+        { key: "ventasDiaEsim", label: "eSIM" },
+        { key: "ventasDiaPospago", label: "Pospago" },
+      ],
+    },
+    {
+      id: "ayudaVisitas",
+      type: "scaleWhy",
+      title:
+        "¿Consideras que la activación con las promotoras te ayudó a incrementar la visita de más clientes?",
+      hint: "Califica de 1 a 5 y cuéntanos por qué.",
+      whyKey: "ayudaVisitasPorque",
+      whyLabel: "¿Por qué?",
+      whyPlaceholder: "Explica tu respuesta…",
+      options: SCALE_1_5,
+    },
+    {
+      id: "oportunidadesVenta",
+      type: "choice",
+      title: "¿La activación generó oportunidades de venta?",
+      options: ["Sí", "No"],
+    },
+    {
+      id: "productosMasVentas",
       type: "sales",
-      title: "¿Cuántas ventas obtuviste durante la vinculación BTL?",
-      hint: "Elige lo que vendiste. Al seleccionarlo puedes anotar la cantidad (máximo 25).",
+      title: "¿Qué productos o servicios se obtuvo más ventas durante la activación?",
+      hint: "Elige los que aplican y anota la cantidad (máximo 25). Si eliges Otro, especifica.",
       options: [
-        { label: "eSIM", qtyKey: "ventasEsim" },
-        { label: "SIM", qtyKey: "ventasSim" },
-        { label: "Portabilidad", qtyKey: "ventasPortabilidad" },
-        { label: "Descargas nuevas", qtyKey: "ventasDescargas" },
+        { label: "Línea nueva", qtyKey: "ventasActLineaNueva" },
+        { label: "Portabilidad", qtyKey: "ventasActPortabilidad" },
+        { label: "eSIM", qtyKey: "ventasActEsim" },
+        { label: "Pospago", qtyKey: "ventasActPospago" },
+        { label: "Otro", qtyKey: "ventasActOtroQty", otherTextKey: "ventasActOtroTexto" },
       ],
     },
     {
-      id: "experiencia",
-      type: "stars",
-      title: "¿Cómo calificarías tu experiencia general con la activación?",
-      options: [
-        { value: "1", label: "Muy mala" },
-        { value: "2", label: "Mala" },
-        { value: "3", label: "Regular" },
-        { value: "4", label: "Buena" },
-        { value: "5", label: "Excelente" },
-      ],
+      id: "imagenPromotoras",
+      type: "scaleWhy",
+      title:
+        "¿Qué tan satisfecho(a) quedaste con la presentación e imagen de las promotoras/ros durante la activación?",
+      hint: "Califica de 1 a 5 y cuéntanos por qué.",
+      whyKey: "imagenPromotorasPorque",
+      whyLabel: "¿Por qué?",
+      whyPlaceholder: "Explica tu respuesta…",
+      options: SCALE_1_5,
     },
     {
-      id: "satisfaccion",
-      type: "emoji",
-      title: "¿Qué tan satisfecho(a) quedaste con la experiencia?",
-      options: [
-        { value: "Muy insatisfecho(a)", emoji: "😞", label: "Muy insatisfecho(a)" },
-        { value: "Insatisfecho(a)", emoji: "🙁", label: "Insatisfecho(a)" },
-        { value: "Neutral", emoji: "😐", label: "Neutral" },
-        { value: "Satisfecho(a)", emoji: "🙂", label: "Satisfecho(a)" },
-        { value: "Muy satisfecho(a)", emoji: "😍", label: "Muy satisfecho(a)" },
-      ],
+      id: "ejecucion",
+      type: "choiceWhy",
+      title: "¿Cómo calificas la ejecución de la activación con las promotoras?",
+      options: ["Muy deficiente", "Deficiente", "Regular", "Buena", "Excelente"],
+      whyKey: "ejecucionPorque",
+      whyLabel: "¿Por qué?",
+      whyPlaceholder: "Explica tu respuesta…",
     },
     {
-      id: "gusto",
+      id: "horarios",
       type: "choice",
-      title: "¿Qué fue lo que más te gustó de la activación?",
-      options: [
-        "La dinámica/actividad",
-        "Los regalos/premios",
-        "La atención del personal",
-        "El espacio/ambientación",
-        "Otro",
-      ],
-      otherKey: "gustoOtro",
-      otherLabel: "Cuéntanos qué más te gustó",
+      title: "¿Se respetaron los horarios establecidos de la activación?",
+      options: ["Sí", "Parcialmente", "No"],
     },
     {
-      id: "atencion",
-      type: "stars",
-      title: "¿Cómo calificarías la atención del equipo durante la activación?",
-      options: [
-        { value: "1", label: "Muy mala" },
-        { value: "2", label: "Mala" },
-        { value: "3", label: "Regular" },
-        { value: "4", label: "Buena" },
-        { value: "5", label: "Excelente" },
-      ],
-    },
-    {
-      id: "expectativas",
-      type: "choice",
-      title: "¿La activación cumplió con tus expectativas?",
-      options: [
-        "Sí, totalmente",
-        "Sí, parcialmente",
-        "No",
-        "Superó mis expectativas",
-      ],
-    },
-    {
-      id: "interesYaavs",
-      type: "choice",
-      title: "Después de participar, ¿qué tan interesado(a) estás en YAAVS?",
-      options: [
-        "Mucho más interesado(a)",
-        "Más interesado(a)",
-        "Igual que antes",
-        "Menos interesado(a)",
-        "Nada interesado(a)",
-      ],
+      id: "preferenciaYaavs",
+      type: "scale",
+      title:
+        "¿Después de participar en esta activación, qué tan dispuesto(a) estarías a dar mayor preferencia a YAAVS en tu punto de venta?",
+      hint: "Califica de 1 a 5 (1 = nada dispuesto, 5 = muy dispuesto).",
+      options: SCALE_1_5,
     },
     {
       id: "recomienda",
       type: "choice",
-      title: "¿Recomendarías esta experiencia a otra persona?",
-      options: ["Sí", "No", "Tal vez"],
+      title: "¿Recomendarías esta experiencia a otro cliente?",
+      options: ["Sí", "Tal vez", "No"],
+    },
+    {
+      id: "gusto",
+      type: "text",
+      title: "¿Qué fue lo que más te gustó de la activación?",
+      placeholder: "Cuéntanos lo que más te gustó…",
+      required: true,
     },
     {
       id: "mejoras",
       type: "text",
-      title: "¿Qué mejorarías de la activación?",
+      title: "¿Qué mejorarías para próximas activaciones?",
       placeholder: "Cuéntanos qué cambiarías o agregarías…",
       required: true,
-    },
-    {
-      id: "comentarios",
-      type: "text",
-      title: "¿Quieres dejarnos algún comentario adicional?",
-      placeholder: "Opcional",
-      required: false,
     },
   ];
 
@@ -143,37 +162,10 @@
     return Math.round((state.step / total) * 100);
   }
 
-  function canContinue() {
-    const step = STEPS[state.step];
-    if (!step || step.type === "welcome") return true;
-    if (step.type === "text" || step.type === "input") {
-      if (!step.required) return true;
-      return String(state.answers[step.id] || "").trim().length > 0;
-    }
-    if (step.type === "sales") {
-      const selected = Array.isArray(state.answers.ventasTipos) ? state.answers.ventasTipos : [];
-      if (!selected.length) return false;
-      return step.options.every((opt) => {
-        if (!selected.includes(opt.label)) return true;
-        const n = Number(state.answers[opt.qtyKey]);
-        return Number.isInteger(n) && n >= 1 && n <= 25;
-      });
-    }
-    const val = state.answers[step.id];
-    if (!val) return false;
-    if (step.otherKey && val === "Otro") {
-      return String(state.answers[step.otherKey] || "").trim().length > 0;
-    }
-    return true;
-  }
-
-  function selectValue(key, value) {
-    state.answers[key] = value;
-    render();
-  }
-
   function selectedSales() {
-    return Array.isArray(state.answers.ventasTipos) ? [...state.answers.ventasTipos] : [];
+    return Array.isArray(state.answers.productosMasVentas)
+      ? [...state.answers.productosMasVentas]
+      : [];
   }
 
   function clampQty(raw) {
@@ -182,17 +174,64 @@
     return Math.max(1, Math.min(25, Math.round(n)));
   }
 
+  function canContinue() {
+    const step = STEPS[state.step];
+    if (!step || step.type === "welcome") return true;
+
+    if (step.type === "text" || step.type === "input" || step.type === "date") {
+      if (!step.required) return true;
+      return String(state.answers[step.id] || "").trim().length > 0;
+    }
+
+    if (step.type === "scale" || step.type === "choice") {
+      return Boolean(state.answers[step.id]);
+    }
+
+    if (step.type === "scaleWhy" || step.type === "choiceWhy") {
+      if (!state.answers[step.id]) return false;
+      return String(state.answers[step.whyKey] || "").trim().length > 0;
+    }
+
+    if (step.type === "scaleGroup") {
+      return step.items.every((item) => Boolean(state.answers[item.key]));
+    }
+
+    if (step.type === "sales") {
+      const selected = selectedSales();
+      if (!selected.length) return false;
+      return step.options.every((opt) => {
+        if (!selected.includes(opt.label)) return true;
+        const n = Number(state.answers[opt.qtyKey]);
+        const qtyOk = Number.isInteger(n) && n >= 1 && n <= 25;
+        if (!qtyOk) return false;
+        if (opt.otherTextKey) {
+          return String(state.answers[opt.otherTextKey] || "").trim().length > 0;
+        }
+        return true;
+      });
+    }
+
+    return true;
+  }
+
+  function selectValue(key, value) {
+    state.answers[key] = value;
+    render();
+  }
+
   function toggleSale(label, qtyKey) {
     const selected = selectedSales();
     const i = selected.indexOf(label);
     if (i >= 0) {
       selected.splice(i, 1);
       delete state.answers[qtyKey];
+      const opt = STEPS.find((s) => s.type === "sales")?.options?.find((o) => o.label === label);
+      if (opt?.otherTextKey) delete state.answers[opt.otherTextKey];
     } else {
       selected.push(label);
       if (!state.answers[qtyKey]) state.answers[qtyKey] = 1;
     }
-    state.answers.ventasTipos = selected;
+    state.answers.productosMasVentas = selected;
     render();
   }
 
@@ -208,7 +247,7 @@
     render();
     try {
       const payload = {
-        answers: { ...state.answers },
+        answers: { ...state.answers, surveyVersion: "2.2" },
         receivedAt: new Date().toISOString(),
       };
       const res = await fetch(cfg.submitUrl || "/api/submit", {
@@ -284,19 +323,19 @@
     `;
   }
 
-  function renderStars(step) {
+  function renderScale(step, keyOverride) {
+    const key = keyOverride || step.id;
+    const options = step.options || SCALE_1_5;
     return `
-      <div class="stars" role="radiogroup" aria-label="${escapeHtml(step.title)}">
-        ${step.options
+      <div class="scale" role="radiogroup" aria-label="${escapeHtml(step.title || key)}">
+        ${options
           .map((opt) => {
-            const selected = String(state.answers[step.id] || "") === String(opt.value);
+            const selected = String(state.answers[key] || "") === String(opt.value);
             return `
-              <button type="button" class="star-btn ${selected ? "is-selected" : ""}"
-                data-key="${step.id}" data-value="${escapeHtml(opt.value)}" role="radio"
-                aria-checked="${selected}" aria-label="${escapeHtml(opt.value)} ${escapeHtml(opt.label)}">
-                <span class="glyph" aria-hidden="true">⭐</span>
-                <span class="star-num">${escapeHtml(opt.value)}</span>
-                <span class="star-label">${escapeHtml(opt.label)}</span>
+              <button type="button" class="scale-btn ${selected ? "is-selected" : ""}"
+                data-key="${escapeHtml(key)}" data-value="${escapeHtml(opt.value)}" role="radio"
+                aria-checked="${selected}" aria-label="${escapeHtml(opt.value)}">
+                <span class="scale-num">${escapeHtml(opt.value)}</span>
               </button>
             `;
           })
@@ -305,19 +344,65 @@
     `;
   }
 
-  function renderEmoji(step) {
+  function renderScaleWhy(step) {
+    const has = Boolean(state.answers[step.id]);
     return `
-      <div class="emojis" role="radiogroup" aria-label="${escapeHtml(step.title)}">
-        ${step.options
-          .map((opt) => {
-            const selected = state.answers[step.id] === opt.value;
+      ${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}
+      ${renderScale(step)}
+      ${
+        has
+          ? `<div class="field">
+              <label for="why-${step.whyKey}">${escapeHtml(step.whyLabel || "¿Por qué?")}</label>
+              <textarea id="why-${step.whyKey}" data-text="${step.whyKey}"
+                placeholder="${escapeHtml(step.whyPlaceholder || "Explica tu respuesta…")}">${escapeHtml(
+                  state.answers[step.whyKey] || ""
+                )}</textarea>
+            </div>`
+          : ""
+      }
+    `;
+  }
+
+  function renderChoiceWhy(step) {
+    const has = Boolean(state.answers[step.id]);
+    return `
+      ${renderChoice(step)}
+      ${
+        has
+          ? `<div class="field">
+              <label for="why-${step.whyKey}">${escapeHtml(step.whyLabel || "¿Por qué?")}</label>
+              <textarea id="why-${step.whyKey}" data-text="${step.whyKey}"
+                placeholder="${escapeHtml(step.whyPlaceholder || "Explica tu respuesta…")}">${escapeHtml(
+                  state.answers[step.whyKey] || ""
+                )}</textarea>
+            </div>`
+          : ""
+      }
+    `;
+  }
+
+  function renderScaleGroup(step) {
+    return `
+      ${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}
+      <div class="scale-group">
+        ${step.items
+          .map((item) => {
             return `
-              <button type="button" class="emoji-btn ${selected ? "is-selected" : ""}"
-                data-key="${step.id}" data-value="${escapeHtml(opt.value)}" role="radio"
-                aria-checked="${selected}">
-                <span class="glyph" aria-hidden="true">${opt.emoji}</span>
-                <span>${escapeHtml(opt.label)}</span>
-              </button>
+              <div class="scale-row">
+                <p class="scale-row-label">${escapeHtml(item.label)}</p>
+                <div class="scale" role="radiogroup" aria-label="${escapeHtml(item.label)}">
+                  ${SCALE_1_5.map((opt) => {
+                    const selected = String(state.answers[item.key] || "") === String(opt.value);
+                    return `
+                      <button type="button" class="scale-btn ${selected ? "is-selected" : ""}"
+                        data-key="${escapeHtml(item.key)}" data-value="${escapeHtml(opt.value)}"
+                        role="radio" aria-checked="${selected}">
+                        <span class="scale-num">${escapeHtml(opt.value)}</span>
+                      </button>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
             `;
           })
           .join("")}
@@ -355,21 +440,25 @@
 
   function renderText(step) {
     const isInput = step.type === "input";
+    const isDate = step.type === "date";
     return `
       <div class="field">
         <label for="text-${step.id}">${
-          step.required ? (isInput ? "Clave YAAVSER" : "Respuesta") : "Opcional"
+          isDate ? "Fecha" : isInput ? "Respuesta" : step.required ? "Respuesta" : "Opcional"
         }</label>
         ${
-          isInput
-            ? `<input id="text-${step.id}" data-text="${step.id}" type="text"
-                inputmode="text" autocomplete="off" spellcheck="false"
-                value="${escapeHtml(state.answers[step.id] || "")}"
-                placeholder="${escapeHtml(step.placeholder || "")}" />`
-            : `<textarea id="text-${step.id}" data-text="${step.id}"
-                placeholder="${escapeHtml(step.placeholder || "")}">${escapeHtml(
-                state.answers[step.id] || ""
-              )}</textarea>`
+          isDate
+            ? `<input id="text-${step.id}" data-text="${step.id}" type="date"
+                value="${escapeHtml(state.answers[step.id] || "")}" required />`
+            : isInput
+              ? `<input id="text-${step.id}" data-text="${step.id}" type="text"
+                  inputmode="text" autocomplete="off" spellcheck="false"
+                  value="${escapeHtml(state.answers[step.id] || "")}"
+                  placeholder="${escapeHtml(step.placeholder || "")}" />`
+              : `<textarea id="text-${step.id}" data-text="${step.id}"
+                  placeholder="${escapeHtml(step.placeholder || "")}">${escapeHtml(
+                    state.answers[step.id] || ""
+                  )}</textarea>`
         }
         ${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}
       </div>
@@ -396,7 +485,7 @@
                 ${
                   on
                     ? `<div class="sale-qty">
-                        <label for="qty-${opt.qtyKey}">¿Cuántas vendiste?</label>
+                        <label for="qty-${opt.qtyKey}">¿Cuántas?</label>
                         <div class="qty-row">
                           <button type="button" class="qty-btn" data-qty-step="-1" data-qty-key="${
                             opt.qtyKey
@@ -409,6 +498,14 @@
                           }" aria-label="Más">+</button>
                         </div>
                         <span class="qty-cap">Máximo 25</span>
+                        ${
+                          opt.otherTextKey
+                            ? `<label for="other-${opt.otherTextKey}">Especifica Otro</label>
+                               <input id="other-${opt.otherTextKey}" data-text="${opt.otherTextKey}" type="text"
+                                 value="${escapeHtml(state.answers[opt.otherTextKey] || "")}"
+                                 placeholder="Producto / servicio…" />`
+                            : ""
+                        }
                       </div>`
                     : ""
                 }
@@ -422,10 +519,12 @@
 
   function renderQuestion(step) {
     let body = "";
-    if (step.type === "stars") body = renderStars(step);
-    else if (step.type === "emoji") body = renderEmoji(step);
+    if (step.type === "scale") body = `${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}${renderScale(step)}`;
+    else if (step.type === "scaleWhy") body = renderScaleWhy(step);
+    else if (step.type === "scaleGroup") body = renderScaleGroup(step);
     else if (step.type === "choice") body = renderChoice(step);
-    else if (step.type === "text" || step.type === "input") body = renderText(step);
+    else if (step.type === "choiceWhy") body = renderChoiceWhy(step);
+    else if (step.type === "text" || step.type === "input" || step.type === "date") body = renderText(step);
     else if (step.type === "sales") body = renderSales(step);
 
     const isLast = state.step === STEPS.length - 1;
