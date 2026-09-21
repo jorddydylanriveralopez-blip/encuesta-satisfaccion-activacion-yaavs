@@ -12,7 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./resultados.css?v=20260917b" />
+    <link rel="stylesheet" href="./resultados.css?v=20260921a" />
   </head>
   <body>
     <div class="shell">
@@ -45,6 +45,7 @@
             </span>
             <a class="btn btn-quiet" href="./">Nueva respuesta</a>
             <button type="button" class="btn btn-quiet" id="btnRefresh">Actualizar</button>
+            <button type="button" class="btn btn-quiet" id="btnTrashView">Papelera <span id="trashBadge">0</span></button>
             <a class="btn btn-quiet" href="./api/responses" target="_blank" rel="noopener">JSON</a>
             <button type="button" class="btn btn-solid" id="btnExcel">Descargar Excel</button>
           </div>
@@ -115,6 +116,21 @@
         </section>
 
         <section class="toolbar" aria-label="Filtros">
+          <div class="date-range" aria-label="Filtro por fechas">
+            <p class="date-range-label">Filtrar por fechas</p>
+            <div class="date-range-fields">
+              <label class="field">
+                Desde
+                <input type="date" id="desde" />
+              </label>
+              <span class="date-range-sep" aria-hidden="true">→</span>
+              <label class="field">
+                Hasta
+                <input type="date" id="hasta" />
+              </label>
+            </div>
+            <p class="date-range-hint" id="dateHint">Ejemplo: del 18 de junio al 19 de agosto.</p>
+          </div>
           <label class="field field-search">
             <span class="sr-only">Buscar</span>
             <input
@@ -151,14 +167,6 @@
             </select>
           </label>
           <label class="field">
-            Desde
-            <input type="date" id="desde" />
-          </label>
-          <label class="field">
-            Hasta
-            <input type="date" id="hasta" />
-          </label>
-          <label class="field">
             Orden
             <select id="orden">
               <option value="fecha-desc">Fecha ↓</option>
@@ -181,6 +189,9 @@
             <h2 id="groupTitle">Respuestas</h2>
             <span id="groupCount">0</span>
           </div>
+          <p class="trash-banner" id="trashBanner" hidden>
+            Estás viendo la papelera. Puedes restaurar respuestas o eliminarlas para siempre.
+          </p>
           <ul class="board board-grid" id="board"></ul>
           <div class="empty" id="empty" hidden>
             <h2>Sin respuestas aún</h2>
@@ -200,6 +211,6 @@
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="./resultados.js?v=20260917b" defer></script>
+    <script src="./resultados.js?v=20260921a" defer></script>
   </body>
 </html>

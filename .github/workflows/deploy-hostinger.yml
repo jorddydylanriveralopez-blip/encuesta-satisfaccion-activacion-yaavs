@@ -44,7 +44,7 @@ jobs:
           HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
         run: |
           DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
-          curl -fsS --connect-timeout 10 --max-time 25 "https://${DOMAIN}/api/responses" -o responses-live.json \
+          curl -fsS --connect-timeout 10 --max-time 25 "https://${DOMAIN}/api/responses?includeTrash=1" -o responses-live.json \
             || echo '{"responses":[]}' > responses-live.json
           python3 -c "import json; d=json.load(open('responses-live.json')); print('backed up', len(d.get('responses') or d.get('items') or []))"
 
@@ -289,7 +289,8 @@ jobs:
                       "id": r.get("id"),
                       "receivedAt": r.get("receivedAt"),
                       "timestamp": r.get("timestamp"),
-                      "answers": {k: v for k, v in r.items() if k not in ("id", "receivedAt", "timestamp")},
+                      "deletedAt": r.get("deletedAt") or None,
+                      "answers": {k: v for k, v in r.items() if k not in ("id", "receivedAt", "timestamp", "deletedAt")},
                   }
                   for r in items
               ],

@@ -170,12 +170,17 @@ function clampSaleQty(v) {
   return Math.max(0, Math.min(25, Math.round(n)));
 }
 
+function isTrashed(entry) {
+  return Boolean(entry && entry.deletedAt);
+}
+
 function flatten(entry) {
   const a = entry.answers && typeof entry.answers === "object" ? entry.answers : {};
   const out = {
     id: entry.id || "",
     receivedAt: entry.receivedAt || entry.timestamp || "",
     timestamp: entry.timestamp || entry.receivedAt || "",
+    deletedAt: entry.deletedAt || "",
   };
   for (const [key] of FIELD_ORDER) {
     if (key === "receivedAt" || key === "id") continue;
@@ -189,6 +194,22 @@ function flatten(entry) {
   else if (totalV1 > 0) out.ventasTotal = String(totalV1);
   else out.ventasTotal = out.ventasTotal || "";
   return out;
+}
+
+function activeEntries() {
+  return readResponses().filter((r) => !isTrashed(r));
+}
+
+function trashEntries() {
+  return readResponses().filter((r) => isTrashed(r));
+}
+
+function parseIds(body) {
+  if (Array.isArray(body?.ids)) {
+    return body.ids.map((id) => String(id || "").trim()).filter(Boolean);
+  }
+  const one = String(body?.id || "").trim();
+  return one ? [one] : [];
 }
 
 function normalize(body) {
@@ -257,7 +278,7 @@ function formatDateMx(iso) {
 }
 
 function sortedItems() {
-  return readResponses()
+  return activeEntries()
     .map(flatten)
     .sort((a, b) => {
       const ta = new Date(a.receivedAt || a.timestamp || 0).getTime();
@@ -463,15 +484,111 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-app.get("/api/responses", (_req, res) => {
-  const items = readResponses().map(flatten);
+app.get("/api/responses", (req, res) => {
+  const includeTrash =
+    String(req.query.includeTrash || "").trim() === "1" ||
+    String(req.query.includeTrash || "").toLowerCase() === "true";
+  const source = includeTrash ? readResponses() : activeEntries();
+  const items = source.map(flatten);
   res.json({
     ok: true,
-    count: items.length,
+    count: activeEntries().length,
+    trashCount: trashEntries().length,
     sheetsConfigured: Boolean(SHEETS_WEBHOOK_URL),
     responses: items,
     items,
   });
+});
+
+app.get("/api/trash", (_req, res) => {
+  const items = trashEntries()
+    .map(flatten)
+    .sort((a, b) => {
+      const ta = new Date(a.deletedAt || a.receivedAt || 0).getTime();
+      const tb = new Date(b.deletedAt || b.receivedAt || 0).getTime();
+      return tb - ta;
+    });
+  res.json({
+    ok: true,
+    count: items.length,
+    responses: items,
+    items,
+  });
+});
+
+app.post("/api/trash", (req, res) => {
+  try {
+    const ids = new Set(parseIds(req.body));
+    if (!ids.size) {
+      return res.status(400).json({ ok: false, error: "Falta el id de la respuesta." });
+    }
+    const now = new Date().toISOString();
+    let moved = 0;
+    const list = readResponses().map((entry) => {
+      if (!ids.has(entry.id) || isTrashed(entry)) return entry;
+      moved += 1;
+      return { ...entry, deletedAt: now };
+    });
+    writeResponses(list);
+    res.json({
+      ok: true,
+      moved,
+      count: list.filter((r) => !isTrashed(r)).length,
+      trashCount: list.filter((r) => isTrashed(r)).length,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "No se pudo mover a la papelera." });
+  }
+});
+
+app.post("/api/restore", (req, res) => {
+  try {
+    const ids = new Set(parseIds(req.body));
+    if (!ids.size) {
+      return res.status(400).json({ ok: false, error: "Falta el id de la respuesta." });
+    }
+    let restored = 0;
+    const list = readResponses().map((entry) => {
+      if (!ids.has(entry.id) || !isTrashed(entry)) return entry;
+      restored += 1;
+      const next = { ...entry };
+      delete next.deletedAt;
+      return next;
+    });
+    writeResponses(list);
+    res.json({
+      ok: true,
+      restored,
+      count: list.filter((r) => !isTrashed(r)).length,
+      trashCount: list.filter((r) => isTrashed(r)).length,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "No se pudo restaurar la respuesta." });
+  }
+});
+
+app.post("/api/trash/purge", (req, res) => {
+  try {
+    const ids = new Set(parseIds(req.body));
+    if (!ids.size) {
+      return res.status(400).json({ ok: false, error: "Falta el id de la respuesta." });
+    }
+    const before = readResponses();
+    const list = before.filter((entry) => !(ids.has(entry.id) && isTrashed(entry)));
+    const purged = before.length - list.length;
+    writeResponses(list);
+    res.json({
+      ok: true,
+      purged,
+      count: list.filter((r) => !isTrashed(r)).length,
+      trashCount: list.filter((r) => isTrashed(r)).length,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "No se pudo eliminar de forma permanente." });
+  }
 });
 
 async function sendExcel(res) {
@@ -543,9 +660,11 @@ app.get("/api/export", (_req, res) => {
 });
 
 app.get("/api/health", (_req, res) => {
+  const all = readResponses();
   res.json({
     ok: true,
-    count: readResponses().length,
+    count: all.filter((r) => !isTrashed(r)).length,
+    trashCount: all.filter((r) => isTrashed(r)).length,
     sheetsConfigured: Boolean(SHEETS_WEBHOOK_URL),
   });
 });
@@ -579,15 +698,22 @@ app.post("/api/import", (req, res) => {
         : [];
     const mode = String(req.body?.mode || "merge").trim(); // merge | replace
     const normalized = incoming.map((row) => {
-      if (row && row.answers && typeof row.answers === "object") return normalize(row);
+      if (row && row.answers && typeof row.answers === "object") {
+        const entry = normalize(row);
+        if (row.deletedAt) entry.deletedAt = String(row.deletedAt);
+        return entry;
+      }
       const {
         id,
         receivedAt,
         timestamp,
+        deletedAt,
         website,
         ...answers
       } = row || {};
-      return normalize({ id, receivedAt, timestamp, answers });
+      const entry = normalize({ id, receivedAt, timestamp, answers });
+      if (deletedAt) entry.deletedAt = String(deletedAt);
+      return entry;
     });
     let list = mode === "replace" ? [] : readResponses();
     const byId = new Map(list.map((r) => [r.id, r]));

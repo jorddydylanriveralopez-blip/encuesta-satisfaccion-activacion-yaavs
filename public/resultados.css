@@ -427,11 +427,108 @@ a {
 
 .toolbar {
   display: grid;
-  grid-template-columns: 1.5fr repeat(5, minmax(0, 0.85fr)) auto;
+  grid-template-columns: 1.5fr repeat(4, minmax(0, 0.85fr)) auto;
   gap: 0.75rem;
   margin-top: 1.1rem;
   padding: 1rem 0 0.25rem;
   animation: rise 0.68s ease both;
+}
+
+.date-range {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: rgba(243, 248, 251, 0.95);
+  border: 1px solid rgba(0, 43, 68, 0.08);
+}
+
+.date-range-label {
+  margin: 0;
+  width: 100%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.date-range-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.75rem;
+}
+
+.date-range-fields .field {
+  min-width: 10rem;
+}
+
+.date-range-sep {
+  color: var(--muted);
+  font-weight: 700;
+  padding-bottom: 0.55rem;
+}
+
+.date-range-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.trash-banner {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: #fff4f4;
+  border: 1px solid rgba(200, 48, 72, 0.18);
+  color: #7a2030;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+#btnTrashView.on {
+  background: rgba(255, 255, 255, 0.28);
+  outline: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+#trashBadge {
+  display: inline-flex;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  margin-left: 0.25rem;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.item-trash {
+  outline: 1px dashed rgba(200, 48, 72, 0.28);
+}
+
+.btn-danger {
+  background: #fff1f3;
+  color: #9b2034;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #ffdbe2;
+}
+
+.btn-solid-dark {
+  background: var(--navy);
+  color: #fff;
+}
+
+.btn-solid-dark:hover:not(:disabled) {
+  background: #014866;
 }
 
 .field {

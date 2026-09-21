@@ -12,12 +12,17 @@
   const desdeEl = document.getElementById("desde");
   const hastaEl = document.getElementById("hasta");
   const ordenEl = document.getElementById("orden");
+  const trashBanner = document.getElementById("trashBanner");
+  const btnTrashView = document.getElementById("btnTrashView");
+  const dateHint = document.getElementById("dateHint");
   const modal = document.getElementById("modal");
   const modalHero = document.getElementById("modalHero");
   const modalBody = document.getElementById("modalBody");
   const modalActions = document.getElementById("modalActions");
 
   let items = [];
+  let trashCount = 0;
+  let viewMode = "active"; // active | trash
   let view = "grid";
   let lastSync = null;
   let optionsFilled = false;
@@ -109,13 +114,43 @@
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
+  function dayKeyFromValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+    const d = parseDate(raw);
+    if (!d) return null;
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Mexico_City",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  }
+
+  function responseDayKey(r) {
+    return dayKeyFromValue(r.fecha) || dayKeyFromValue(r.receivedAt || r.timestamp);
+  }
+
   function formatDate(iso) {
+    const key = dayKeyFromValue(iso);
+    if (key) {
+      const [y, m, d] = key.split("-").map(Number);
+      const local = new Date(y, m - 1, d);
+      return new Intl.DateTimeFormat("es-MX", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(local);
+    }
     const d = parseDate(iso);
     if (!d) return "—";
     return new Intl.DateTimeFormat("es-MX", {
       day: "2-digit",
       month: "short",
       year: "numeric",
+      timeZone: "America/Mexico_City",
     }).format(d);
   }
 
@@ -125,7 +160,21 @@
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
+      timeZone: "America/Mexico_City",
     }).format(d);
+  }
+
+  function formatDayRangeHint() {
+    if (!dateHint) return;
+    const desde = desdeEl.value;
+    const hasta = hastaEl.value;
+    if (!desde && !hasta) {
+      dateHint.textContent = "Elige un rango (ej. 18 junio → 19 agosto) para ver solo esas respuestas.";
+      return;
+    }
+    const a = desde ? formatDate(desde) : "inicio";
+    const b = hasta ? formatDate(hasta) : "hoy";
+    dateHint.textContent = `Mostrando del ${a} al ${b}.`;
   }
 
   function avg(list, key) {
@@ -162,19 +211,21 @@
     const sat = fSatisfaccion.value;
     const rec = fRecomienda.value;
     const exp = fExperiencia.value;
-    const desde = desdeEl.value ? new Date(`${desdeEl.value}T00:00:00`) : null;
-    const hasta = hastaEl.value ? new Date(`${hastaEl.value}T23:59:59`) : null;
+    const desde = dayKeyFromValue(desdeEl.value);
+    const hasta = dayKeyFromValue(hastaEl.value);
 
     let list = items.filter((r) => {
       if (sat && r.satisfaccion !== sat) return false;
       if (rec && r.recomienda !== rec) return false;
       if (exp && String(r.experiencia) !== exp) return false;
-      const d = parseDate(r.receivedAt || r.timestamp);
-      if (desde && d && d < desde) return false;
-      if (hasta && d && d > hasta) return false;
+      const day = responseDayKey(r);
+      if (desde && (!day || day < desde)) return false;
+      if (hasta && (!day || day > hasta)) return false;
       if (q) {
         const hay = [
           r.clave,
+          r.nombre,
+          r.municipio,
           r.satisfaccion,
           r.gusto,
           r.gustoOtro,
@@ -195,14 +246,16 @@
 
     const orden = ordenEl.value;
     list.sort((a, b) => {
-      const da = parseDate(a.receivedAt || a.timestamp)?.getTime() || 0;
-      const db = parseDate(b.receivedAt || b.timestamp)?.getTime() || 0;
-      if (orden === "fecha-asc") return da - db;
+      const da = responseDayKey(a) || "";
+      const db = responseDayKey(b) || "";
+      const ta = parseDate(a.receivedAt || a.timestamp)?.getTime() || 0;
+      const tb = parseDate(b.receivedAt || b.timestamp)?.getTime() || 0;
+      if (orden === "fecha-asc") return da.localeCompare(db) || ta - tb;
       if (orden === "exp-desc") return Number(b.experiencia || 0) - Number(a.experiencia || 0);
       if (orden === "clave-asc") {
         return String(a.clave || "").localeCompare(String(b.clave || ""), "es");
       }
-      return db - da;
+      return db.localeCompare(da) || tb - ta;
     });
 
     return list;
@@ -418,44 +471,60 @@
   }
 
   function cardHtml(r, i) {
-    const lvl = level(r.experiencia);
+    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
     const animClass = animateCards ? "item item-enter" : "item";
     const delay = animateCards ? Math.min(i * 0.04, 0.35) : 0;
+    const dayLabel = formatDate(r.fecha || r.receivedAt || r.timestamp);
+    const actions =
+      viewMode === "trash"
+        ? `
+          <button type="button" class="btn btn-soft" data-open="${escapeHtml(r.id)}">Ver</button>
+          <button type="button" class="btn btn-solid-dark" data-restore="${escapeHtml(r.id)}">Restaurar</button>
+          <button type="button" class="btn btn-danger" data-purge="${escapeHtml(r.id)}">Eliminar</button>
+        `
+        : `
+          <button type="button" class="btn btn-soft" data-open="${escapeHtml(r.id)}">Ver</button>
+          <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV</button>
+          <button type="button" class="btn btn-danger" data-trash="${escapeHtml(r.id)}">Papelera</button>
+        `;
     return `
-      <li class="${animClass}" style="animation-delay:${delay}s" data-id="${escapeHtml(r.id)}">
+      <li class="${animClass}${viewMode === "trash" ? " item-trash" : ""}" style="animation-delay:${delay}s" data-id="${escapeHtml(r.id)}">
         <button type="button" class="item-hit" data-open="${escapeHtml(r.id)}">
           <div class="item-media">
             <div class="item-media-glow" aria-hidden="true"></div>
             <div class="badge-stack">
               <span class="badge ${lvl.cls}">${lvl.label}</span>
             </div>
-            <span class="item-stars">${escapeHtml(r.experiencia || "—")}/5</span>
+            <span class="item-stars">${escapeHtml(r.experiencia || r.preferenciaYaavs || "—")}/5</span>
           </div>
           <div class="item-body">
             <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
-            <p class="item-line">${escapeHtml(r.satisfaccion || "—")} · ${escapeHtml(
-              r.gusto || "—"
+            <p class="item-line">${escapeHtml(r.satisfaccion || r.recomienda || "—")} · ${escapeHtml(
+              r.gusto || r.municipio || "—"
             )}</p>
             <p class="item-meta">${escapeHtml(r.recomienda ? `Recomienda: ${r.recomienda}` : "")}${
               r.atencion ? ` · Atención ${r.atencion}/5` : ""
             }${
               salesLine(r) ? ` · ${salesLine(r)}` : r.ventasTotal ? ` · Ventas ${r.ventasTotal}` : ""
+            }${
+              viewMode === "trash" && r.deletedAt
+                ? ` · En papelera desde ${formatDate(r.deletedAt)}`
+                : ""
             }</p>
-            <p class="item-date">${formatDate(r.receivedAt || r.timestamp)}</p>
+            <p class="item-date">${dayLabel}</p>
           </div>
         </button>
         <div class="item-actions">
-          <button type="button" class="btn btn-soft" data-open="${escapeHtml(r.id)}">Ver</button>
-          <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV</button>
+          ${actions}
         </div>
       </li>
     `;
   }
 
   function boardKey(list) {
-    return `${view}|${list.map((r) => r.id).join(",")}|${qEl.value}|${fSatisfaccion.value}|${
+    return `${viewMode}|${view}|${list.map((r) => r.id).join(",")}|${qEl.value}|${fSatisfaccion.value}|${
       fRecomienda.value
-    }|${fExperiencia.value}|${desdeEl.value}|${hastaEl.value}|${ordenEl.value}`;
+    }|${fExperiencia.value}|${desdeEl.value}|${hastaEl.value}|${ordenEl.value}|${trashCount}`;
   }
 
   function metricsKey(list) {
@@ -473,9 +542,27 @@
 
   function renderBoard(forceCards = false) {
     const list = filtered();
-    liveCount.textContent = String(items.length);
+    liveCount.textContent = String(viewMode === "trash" ? trashCount : items.length);
+    const badgeEl = document.getElementById("trashBadge");
+    if (badgeEl) badgeEl.textContent = String(trashCount);
+    if (trashBanner) trashBanner.hidden = viewMode !== "trash";
+    if (btnTrashView) {
+      btnTrashView.classList.toggle("on", viewMode === "trash");
+      btnTrashView.innerHTML =
+        viewMode === "trash"
+          ? "Volver a activas"
+          : `Papelera <span id="trashBadge">${trashCount}</span>`;
+    }
+    formatDayRangeHint();
     groupCount.textContent = `${list.length}`;
-    groupTitle.textContent = list.length === 1 ? "Respuesta" : "Respuestas";
+    groupTitle.textContent =
+      viewMode === "trash"
+        ? list.length === 1
+          ? "En papelera"
+          : "Papelera"
+        : list.length === 1
+          ? "Respuesta"
+          : "Respuestas";
 
     const mKey = metricsKey(list);
     if (mKey !== lastMetricsKey) {
@@ -498,12 +585,18 @@
     if (!list.length) {
       boardEl.innerHTML = "";
       emptyEl.hidden = false;
-      emptyEl.querySelector("h2").textContent = items.length
-        ? "Sin coincidencias"
-        : "Sin respuestas aún";
-      emptyEl.querySelector("p").textContent = items.length
-        ? "Prueba limpiar filtros o cambiar la búsqueda."
-        : "Cuando alguien complete la encuesta, aparecerá aquí en tiempo real.";
+      if (viewMode === "trash") {
+        emptyEl.querySelector("h2").textContent = "Papelera vacía";
+        emptyEl.querySelector("p").textContent =
+          "Cuando muevas una respuesta a la papelera, aparecerá aquí para restaurarla.";
+      } else {
+        emptyEl.querySelector("h2").textContent = items.length
+          ? "Sin coincidencias"
+          : "Sin respuestas aún";
+        emptyEl.querySelector("p").textContent = items.length
+          ? "Prueba otro rango de fechas o limpia los filtros."
+          : "Cuando alguien complete la encuesta, aparecerá aquí en tiempo real.";
+      }
       animateCards = false;
       return;
     }
@@ -555,8 +648,15 @@
           return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
         })
         .join("");
-    modalActions.innerHTML = `
+    modalActions.innerHTML =
+      viewMode === "trash"
+        ? `
+      <button type="button" class="btn btn-solid-dark" data-restore="${escapeHtml(r.id)}">Restaurar</button>
+      <button type="button" class="btn btn-danger" data-purge="${escapeHtml(r.id)}">Eliminar para siempre</button>
+    `
+        : `
       <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV de esta respuesta</button>
+      <button type="button" class="btn btn-danger" data-trash="${escapeHtml(r.id)}">Mover a papelera</button>
       <a class="btn btn-soft" href="./api/descargar-excel" data-excel>Excel completo</a>
     `;
     if (typeof modal.showModal === "function") modal.showModal();
@@ -601,12 +701,23 @@
 
   async function load() {
     try {
-      const res = await fetch("/api/responses", { cache: "no-store" });
-      const data = await res.json();
+      const [mainRes, metaRes] = await Promise.all([
+        fetch(viewMode === "trash" ? "/api/trash" : "/api/responses", { cache: "no-store" }),
+        viewMode === "trash"
+          ? fetch("/api/responses", { cache: "no-store" })
+          : Promise.resolve(null),
+      ]);
+      const data = await mainRes.json();
       const next = Array.isArray(data.responses) ? data.responses : [];
       const prevSig = items.map((r) => r.id).join(",");
       const nextSig = next.map((r) => r.id).join(",");
       items = next;
+      if (viewMode === "trash") {
+        const meta = metaRes ? await metaRes.json() : {};
+        trashCount = Number(meta.trashCount) || next.length;
+      } else {
+        trashCount = Number(data.trashCount) || 0;
+      }
       lastSync = new Date().toISOString();
       fillSatisfaccionOptions(items);
       if (prevSig !== nextSig) {
@@ -622,12 +733,107 @@
     }
   }
 
+  async function moveToTrash(id) {
+    if (!id) return;
+    if (!window.confirm("¿Mover esta respuesta a la papelera?")) return;
+    try {
+      const res = await fetch("/api/trash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "error");
+      trashCount = Number(data.trashCount) || trashCount;
+      if (typeof modal.close === "function") modal.close();
+      else modal.removeAttribute("open");
+      await load();
+    } catch (_) {
+      window.alert("No se pudo mover a la papelera. Intenta de nuevo.");
+    }
+  }
+
+  async function restoreFromTrash(id) {
+    if (!id) return;
+    try {
+      const res = await fetch("/api/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "error");
+      trashCount = Number(data.trashCount) || trashCount;
+      if (typeof modal.close === "function") modal.close();
+      else modal.removeAttribute("open");
+      await load();
+    } catch (_) {
+      window.alert("No se pudo restaurar. Intenta de nuevo.");
+    }
+  }
+
+  async function purgeForever(id) {
+    if (!id) return;
+    if (
+      !window.confirm(
+        "Esto elimina la respuesta para siempre y no se puede deshacer. ¿Continuar?"
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/trash/purge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "error");
+      trashCount = Number(data.trashCount) || trashCount;
+      if (typeof modal.close === "function") modal.close();
+      else modal.removeAttribute("open");
+      await load();
+    } catch (_) {
+      window.alert("No se pudo eliminar. Intenta de nuevo.");
+    }
+  }
+
+  function setViewMode(next) {
+    if (viewMode === next) return;
+    viewMode = next;
+    items = [];
+    lastBoardKey = "";
+    lastChartsKey = "";
+    lastMetricsKey = "";
+    lastSalesKey = "";
+    animateCards = true;
+    load();
+  }
+
   boardEl.addEventListener("click", (e) => {
     const openBtn = e.target.closest("[data-open]");
     const csvBtn = e.target.closest("[data-csv]");
+    const trashBtn = e.target.closest("[data-trash]");
+    const restoreBtn = e.target.closest("[data-restore]");
+    const purgeBtn = e.target.closest("[data-purge]");
     if (csvBtn) {
       e.preventDefault();
       downloadCsvOne(csvBtn.getAttribute("data-csv"));
+      return;
+    }
+    if (trashBtn) {
+      e.preventDefault();
+      moveToTrash(trashBtn.getAttribute("data-trash"));
+      return;
+    }
+    if (restoreBtn) {
+      e.preventDefault();
+      restoreFromTrash(restoreBtn.getAttribute("data-restore"));
+      return;
+    }
+    if (purgeBtn) {
+      e.preventDefault();
+      purgeForever(purgeBtn.getAttribute("data-purge"));
       return;
     }
     if (openBtn) {
@@ -638,7 +844,13 @@
 
   modalActions.addEventListener("click", (e) => {
     const csvBtn = e.target.closest("[data-csv]");
+    const trashBtn = e.target.closest("[data-trash]");
+    const restoreBtn = e.target.closest("[data-restore]");
+    const purgeBtn = e.target.closest("[data-purge]");
     if (csvBtn) downloadCsvOne(csvBtn.getAttribute("data-csv"));
+    if (trashBtn) moveToTrash(trashBtn.getAttribute("data-trash"));
+    if (restoreBtn) restoreFromTrash(restoreBtn.getAttribute("data-restore"));
+    if (purgeBtn) purgeForever(purgeBtn.getAttribute("data-purge"));
   });
 
   document.getElementById("modalClose").addEventListener("click", () => {
@@ -655,6 +867,11 @@
 
   document.getElementById("btnRefresh").addEventListener("click", load);
   document.getElementById("btnClear").addEventListener("click", clearFilters);
+  if (btnTrashView) {
+    btnTrashView.addEventListener("click", () => {
+      setViewMode(viewMode === "trash" ? "active" : "trash");
+    });
+  }
 
   document.getElementById("btnExcel").addEventListener("click", async () => {
     const btn = document.getElementById("btnExcel");
