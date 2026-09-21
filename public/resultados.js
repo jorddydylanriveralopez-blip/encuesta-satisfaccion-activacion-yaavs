@@ -292,38 +292,36 @@
     };
   }
 
-  function pctOf(n, total) {
+  function piePercent(n, total) {
     if (!total) return 0;
     return Math.round((Number(n) / total) * 100);
   }
 
   const piePercentPlugin = {
     id: "piePercentLabels",
-    afterDatasetsDraw(chart) {
+    afterDatasetDraw(chart) {
       const { ctx } = chart;
       const meta = chart.getDatasetMeta(0);
-      if (!meta || !meta.data || !meta.data.length) return;
-      const values = chart.data.datasets[0]?.data || [];
-      const total = values.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
-
-      ctx.save();
+      if (!meta || !meta.data) return;
+      const data = chart.data.datasets[0]?.data || [];
+      const total = data.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
       meta.data.forEach((arc, i) => {
-        const n = Number(values[i]) || 0;
+        const n = Number(data[i]) || 0;
         if (n <= 0) return;
-        const pct = pctOf(n, total);
-        if (pct < 5) return;
-        const { x, y } = arc.tooltipPosition();
+        const pct = piePercent(n, total);
+        if (pct < 4) return;
+        const pos = arc.tooltipPosition();
+        ctx.save();
         ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "rgba(7, 24, 36, 0.35)";
+        ctx.strokeStyle = "rgba(0, 43, 68, 0.25)";
         ctx.lineWidth = 3;
-        ctx.font = "700 12px Outfit, sans-serif";
+        ctx.font = "700 13px Outfit, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const text = `${pct}%`;
-        ctx.strokeText(text, x, y);
-        ctx.fillText(text, x, y);
+        ctx.strokeText(`${pct}%`, pos.x, pos.y);
+        ctx.fillText(`${pct}%`, pos.x, pos.y);
+        ctx.restore();
       });
-      ctx.restore();
     },
   };
 
@@ -387,7 +385,7 @@
                 const total = vals.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
                 return (data.labels || []).map((label, i) => {
                   const n = Number(vals[i]) || 0;
-                  const pct = pctOf(n, total);
+                  const pct = piePercent(n, total);
                   return {
                     text: `${label} · ${n} (${pct}%)`,
                     fillStyle: (ds.backgroundColor || [])[i],
@@ -403,9 +401,9 @@
           tooltip: {
             callbacks: {
               label(ctx) {
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
-                const n = ctx.raw || 0;
-                const pct = pctOf(n, total);
+                const total = ctx.dataset.data.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+                const n = Number(ctx.raw) || 0;
+                const pct = piePercent(n, total);
                 return ` ${ctx.label}: ${n} (${pct}%)`;
               },
             },
