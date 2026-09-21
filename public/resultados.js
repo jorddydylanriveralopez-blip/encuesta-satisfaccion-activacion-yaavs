@@ -292,6 +292,41 @@
     };
   }
 
+  function pctOf(n, total) {
+    if (!total) return 0;
+    return Math.round((Number(n) / total) * 100);
+  }
+
+  const piePercentPlugin = {
+    id: "piePercentLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || !meta.data || !meta.data.length) return;
+      const values = chart.data.datasets[0]?.data || [];
+      const total = values.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+
+      ctx.save();
+      meta.data.forEach((arc, i) => {
+        const n = Number(values[i]) || 0;
+        if (n <= 0) return;
+        const pct = pctOf(n, total);
+        if (pct < 5) return;
+        const { x, y } = arc.tooltipPosition();
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "rgba(7, 24, 36, 0.35)";
+        ctx.lineWidth = 3;
+        ctx.font = "700 12px Outfit, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const text = `${pct}%`;
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+      });
+      ctx.restore();
+    },
+  };
+
   function upsertPie(name, canvasId, emptyId, labels, values) {
     const canvas = document.getElementById(canvasId);
     const empty = document.getElementById(emptyId);
@@ -331,6 +366,7 @@
           },
         ],
       },
+      plugins: [piePercentPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -347,15 +383,20 @@
               generateLabels(chart) {
                 const data = chart.data;
                 const ds = data.datasets[0] || {};
-                const values = ds.data || [];
-                return (data.labels || []).map((label, i) => ({
-                  text: `${label} · ${values[i] || 0}`,
-                  fillStyle: (ds.backgroundColor || [])[i],
-                  strokeStyle: "#fff",
-                  lineWidth: 1,
-                  hidden: false,
-                  index: i,
-                }));
+                const vals = ds.data || [];
+                const total = vals.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+                return (data.labels || []).map((label, i) => {
+                  const n = Number(vals[i]) || 0;
+                  const pct = pctOf(n, total);
+                  return {
+                    text: `${label} · ${n} (${pct}%)`,
+                    fillStyle: (ds.backgroundColor || [])[i],
+                    strokeStyle: "#fff",
+                    lineWidth: 1,
+                    hidden: false,
+                    index: i,
+                  };
+                });
               },
             },
           },
@@ -364,7 +405,7 @@
               label(ctx) {
                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
                 const n = ctx.raw || 0;
-                const pct = Math.round((n / total) * 100);
+                const pct = pctOf(n, total);
                 return ` ${ctx.label}: ${n} (${pct}%)`;
               },
             },
