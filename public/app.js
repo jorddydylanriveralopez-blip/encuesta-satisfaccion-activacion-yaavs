@@ -11,8 +11,7 @@
     { value: "5", label: "5" },
   ];
 
-  const STEPS = [
-    { id: "welcome", type: "welcome" },
+  const QUESTIONS = [
     {
       id: "fecha",
       type: "date",
@@ -140,10 +139,10 @@
   ];
 
   const state = {
-    step: 0,
     answers: {},
     submitting: false,
     done: false,
+    invalidIds: new Set(),
   };
 
   function showToast(msg) {
@@ -154,12 +153,6 @@
     showToast._t = setTimeout(() => {
       toast.hidden = true;
     }, 3200);
-  }
-
-  function progressPct() {
-    const total = STEPS.length - 1;
-    if (state.step <= 0) return 0;
-    return Math.round((state.step / total) * 100);
   }
 
   function selectedSales() {
@@ -174,10 +167,7 @@
     return Math.max(1, Math.min(25, Math.round(n)));
   }
 
-  function canContinue() {
-    const step = STEPS[state.step];
-    if (!step || step.type === "welcome") return true;
-
+  function isQuestionValid(step) {
     if (step.type === "text" || step.type === "input" || step.type === "date") {
       if (!step.required) return true;
       return String(state.answers[step.id] || "").trim().length > 0;
@@ -214,9 +204,28 @@
     return true;
   }
 
+  function validateAll() {
+    const invalid = new Set();
+    QUESTIONS.forEach((step) => {
+      if (!isQuestionValid(step)) invalid.add(step.id);
+    });
+    state.invalidIds = invalid;
+    return invalid.size === 0;
+  }
+
+  function completedCount() {
+    return QUESTIONS.filter((step) => isQuestionValid(step)).length;
+  }
+
   function selectValue(key, value) {
     state.answers[key] = value;
-    render();
+    state.invalidIds.delete(key);
+    QUESTIONS.forEach((q) => {
+      if (q.whyKey && (q.id === key || q.items?.some((i) => i.key === key))) {
+        state.invalidIds.delete(q.id);
+      }
+    });
+    render({ preserveScroll: true });
   }
 
   function toggleSale(label, qtyKey) {
@@ -225,26 +234,38 @@
     if (i >= 0) {
       selected.splice(i, 1);
       delete state.answers[qtyKey];
-      const opt = STEPS.find((s) => s.type === "sales")?.options?.find((o) => o.label === label);
+      const opt = QUESTIONS.find((s) => s.type === "sales")?.options?.find((o) => o.label === label);
       if (opt?.otherTextKey) delete state.answers[opt.otherTextKey];
     } else {
       selected.push(label);
       if (!state.answers[qtyKey]) state.answers[qtyKey] = 1;
     }
     state.answers.productosMasVentas = selected;
-    render();
+    state.invalidIds.delete("productosMasVentas");
+    render({ preserveScroll: true });
   }
 
   function bumpQty(qtyKey, delta) {
     const current = Number(state.answers[qtyKey]) || 1;
     state.answers[qtyKey] = clampQty(current + delta);
-    render();
+    state.invalidIds.delete("productosMasVentas");
+    render({ preserveScroll: true });
   }
 
   async function submit() {
     if (state.submitting) return;
+    if (!validateAll()) {
+      render({ preserveScroll: true });
+      const first = QUESTIONS.find((q) => state.invalidIds.has(q.id));
+      if (first) {
+        const el = document.getElementById(`q-${first.id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      showToast("Completa las preguntas marcadas para enviar");
+      return;
+    }
     state.submitting = true;
-    render();
+    render({ preserveScroll: true });
     try {
       const payload = {
         answers: { ...state.answers, surveyVersion: "2.2" },
@@ -258,59 +279,15 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "Error al enviar");
       state.done = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       showToast(err.message || "No se pudo enviar. Intenta de nuevo.");
       state.submitting = false;
-      render();
+      render({ preserveScroll: true });
       return;
     }
     state.submitting = false;
     render();
-  }
-
-  function go(delta) {
-    const next = state.step + delta;
-    if (next < 0 || next >= STEPS.length) return;
-    const panel = app.querySelector(".panel");
-    if (panel) {
-      panel.classList.add("is-out");
-      setTimeout(() => {
-        state.step = next;
-        render();
-      }, 220);
-      return;
-    }
-    state.step = next;
-    render();
-  }
-
-  function next() {
-    if (!canContinue()) {
-      showToast("Completa esta pregunta para continuar");
-      return;
-    }
-    if (state.step === STEPS.length - 1) {
-      submit();
-      return;
-    }
-    go(1);
-  }
-
-  function renderWelcome() {
-    return `
-      <section class="panel panel-hero">
-        <p class="kicker">Activación BTL</p>
-        <h1>${escapeHtml(cfg.title || "Encuesta de Satisfacción – Activación")}</h1>
-        <p class="lead">${escapeHtml(
-          cfg.intro ||
-            "¡Gracias por participar! Tu opinión nos ayuda a mejorar. Menos de 2 minutos."
-        )}</p>
-        <div class="actions actions-center">
-          <button class="btn btn-primary" type="button" data-action="start">Comenzar encuesta</button>
-        </div>
-        <input class="honeypot" tabindex="-1" autocomplete="off" name="website" id="website" />
-      </section>
-    `;
   }
 
   function renderDone() {
@@ -517,47 +494,94 @@
     `;
   }
 
-  function renderQuestion(step) {
-    let body = "";
-    if (step.type === "scale") body = `${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}${renderScale(step)}`;
-    else if (step.type === "scaleWhy") body = renderScaleWhy(step);
-    else if (step.type === "scaleGroup") body = renderScaleGroup(step);
-    else if (step.type === "choice") body = renderChoice(step);
-    else if (step.type === "choiceWhy") body = renderChoiceWhy(step);
-    else if (step.type === "text" || step.type === "input" || step.type === "date") body = renderText(step);
-    else if (step.type === "sales") body = renderSales(step);
+  function renderQuestionBody(step) {
+    if (step.type === "scale") {
+      return `${step.hint ? `<p class="field-hint">${escapeHtml(step.hint)}</p>` : ""}${renderScale(step)}`;
+    }
+    if (step.type === "scaleWhy") return renderScaleWhy(step);
+    if (step.type === "scaleGroup") return renderScaleGroup(step);
+    if (step.type === "choice") return renderChoice(step);
+    if (step.type === "choiceWhy") return renderChoiceWhy(step);
+    if (step.type === "text" || step.type === "input" || step.type === "date") return renderText(step);
+    if (step.type === "sales") return renderSales(step);
+    return "";
+  }
 
-    const isLast = state.step === STEPS.length - 1;
+  function renderLanding() {
+    const done = completedCount();
+    const total = QUESTIONS.length;
+    const pct = Math.round((done / total) * 100);
     return `
-      <section class="panel">
-        <div class="progress" aria-hidden="true">
-          <div class="progress-track"><div class="progress-fill" style="width:${progressPct()}%"></div></div>
-          <span class="progress-label">${state.step}/${STEPS.length - 1}</span>
+      <section class="panel panel-hero landing-hero">
+        <p class="kicker">Activación BTL</p>
+        <h1>${escapeHtml(cfg.title || "Encuesta de Satisfacción – Activación")}</h1>
+        <p class="lead">${escapeHtml(
+          cfg.intro ||
+            "¡Gracias por participar! Tu opinión nos ayuda a mejorar. Contesta todo en esta misma página."
+        )}</p>
+        <div class="landing-progress" aria-hidden="true">
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <span class="progress-label">${done}/${total} completadas</span>
         </div>
-        <h2 class="q-title">${escapeHtml(step.title)}</h2>
-        ${body}
-        <div class="actions">
-          <button class="btn btn-ghost" type="button" data-action="back" ${
-            state.step <= 1 ? "disabled" : ""
-          }>Atrás</button>
-          <button class="btn btn-primary" type="button" data-action="next" ${
-            !canContinue() || state.submitting ? "disabled" : ""
-          }>
-            ${state.submitting ? "Enviando…" : isLast ? "Enviar encuesta" : "Continuar"}
-          </button>
-        </div>
+        <input class="honeypot" tabindex="-1" autocomplete="off" name="website" id="website" />
       </section>
+
+      <form class="landing-form" id="landingForm" novalidate>
+        ${QUESTIONS.map((step, index) => {
+          const invalid = state.invalidIds.has(step.id);
+          return `
+            <section class="panel question-block ${invalid ? "is-invalid" : ""}" id="q-${step.id}">
+              <div class="question-meta">
+                <span class="question-num">${String(index + 1).padStart(2, "0")}</span>
+                ${invalid ? `<span class="question-warn">Completa esta pregunta</span>` : ""}
+              </div>
+              <h2 class="q-title">${escapeHtml(step.title)}</h2>
+              ${renderQuestionBody(step)}
+            </section>
+          `;
+        }).join("")}
+
+        <section class="panel landing-submit">
+          <p class="landing-submit-note">Revisa tus respuestas y envía cuando estés listo(a).</p>
+          <button class="btn btn-primary btn-wide" type="submit" data-action="submit" ${
+            state.submitting ? "disabled" : ""
+          }>
+            ${state.submitting ? "Enviando…" : "Enviar encuesta"}
+          </button>
+        </section>
+      </form>
     `;
   }
 
-  function render() {
+  function render(opts = {}) {
+    const scrollY = opts.preserveScroll ? window.scrollY : null;
+    const active = document.activeElement;
+    const activeId = active && active.id ? active.id : null;
+    const selectionStart =
+      active && typeof active.selectionStart === "number" ? active.selectionStart : null;
+
     if (state.done) {
       app.innerHTML = renderDone();
       return;
     }
-    const step = STEPS[state.step];
-    if (step.type === "welcome") app.innerHTML = renderWelcome();
-    else app.innerHTML = renderQuestion(step);
+    app.innerHTML = renderLanding();
+
+    if (scrollY != null) window.scrollTo(0, scrollY);
+    if (activeId) {
+      const el = document.getElementById(activeId);
+      if (el && typeof el.focus === "function") {
+        el.focus({ preventScroll: true });
+        if (
+          selectionStart != null &&
+          typeof el.setSelectionRange === "function" &&
+          (el.tagName === "INPUT" || el.tagName === "TEXTAREA")
+        ) {
+          try {
+            el.setSelectionRange(selectionStart, selectionStart);
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   function escapeHtml(str) {
@@ -572,16 +596,9 @@
     const btn = e.target.closest("[data-action], [data-key], [data-sale], [data-qty-step]");
     if (!btn) return;
     const action = btn.getAttribute("data-action");
-    if (action === "start") {
-      go(1);
-      return;
-    }
-    if (action === "back") {
-      go(-1);
-      return;
-    }
-    if (action === "next") {
-      next();
+    if (action === "submit") {
+      e.preventDefault();
+      submit();
       return;
     }
     const sale = btn.getAttribute("data-sale");
@@ -599,17 +616,35 @@
     if (key && value != null) selectValue(key, value);
   });
 
+  app.addEventListener("submit", (e) => {
+    if (e.target && e.target.id === "landingForm") {
+      e.preventDefault();
+      submit();
+    }
+  });
+
   app.addEventListener("input", (e) => {
     const t = e.target;
     if (t.matches("[data-text]")) {
-      state.answers[t.getAttribute("data-text")] = t.value;
-      const primary = app.querySelector('[data-action="next"]');
-      if (primary) primary.disabled = !canContinue() || state.submitting;
+      const key = t.getAttribute("data-text");
+      state.answers[key] = t.value;
+      QUESTIONS.forEach((q) => {
+        if (q.id === key || q.whyKey === key || q.options?.some((o) => o.otherTextKey === key)) {
+          state.invalidIds.delete(q.id);
+        }
+      });
+      const block = t.closest(".question-block");
+      if (block) block.classList.remove("is-invalid");
+      const progress = app.querySelector(".landing-progress .progress-fill");
+      const label = app.querySelector(".landing-progress .progress-label");
+      if (progress && label) {
+        const done = completedCount();
+        progress.style.width = `${Math.round((done / QUESTIONS.length) * 100)}%`;
+        label.textContent = `${done}/${QUESTIONS.length} completadas`;
+      }
     }
     if (t.matches("[data-other]")) {
       state.answers[t.getAttribute("data-other")] = t.value;
-      const primary = app.querySelector('[data-action="next"]');
-      if (primary) primary.disabled = !canContinue() || state.submitting;
     }
     if (t.matches("[data-qty]")) {
       const key = t.getAttribute("data-qty");
@@ -624,8 +659,9 @@
           if (String(clamped) !== raw) t.value = String(clamped);
         }
       }
-      const primary = app.querySelector('[data-action="next"]');
-      if (primary) primary.disabled = !canContinue() || state.submitting;
+      state.invalidIds.delete("productosMasVentas");
+      const block = t.closest(".question-block");
+      if (block) block.classList.remove("is-invalid");
     }
   });
 
