@@ -983,6 +983,113 @@ a {
   text-decoration: none;
 }
 
+.export-capture-host {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.export-card {
+  width: 720px;
+  background: #fff;
+  color: #071824;
+  font-family: Outfit, "Segoe UI", sans-serif;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(7, 24, 36, 0.08);
+}
+
+.export-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(145deg, #01324a, #00506f 55%, #00a0c8);
+  color: #fff;
+}
+
+.export-brand img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.export-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  font-weight: 700;
+}
+
+.export-brand h2 {
+  margin: 0.15rem 0 0;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.export-hero {
+  padding: 1.1rem 1.25rem 0.85rem;
+  border-bottom: 1px solid #d5e4ee;
+}
+
+.export-hero h3 {
+  margin: 0.55rem 0 0;
+  font-family: "Space Grotesk", Outfit, sans-serif;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+  color: #002b44;
+}
+
+.export-hero p {
+  margin: 0.35rem 0 0;
+  color: #3d5568;
+  font-size: 0.95rem;
+}
+
+.export-body {
+  padding: 0.85rem 1.25rem 0.4rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.export-row {
+  display: grid;
+  gap: 0.15rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid #e6eef4;
+}
+
+.export-row:last-child {
+  border-bottom: 0;
+}
+
+.export-row b {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #00a0c8;
+}
+
+.export-row span {
+  color: #071824;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 0.98rem;
+}
+
+.export-foot {
+  margin: 0;
+  padding: 0.85rem 1.25rem 1.1rem;
+  color: #6b8296;
+  font-size: 0.8rem;
+  border-top: 1px solid #e6eef4;
+}
+
 @keyframes rise {
   from {
     opacity: 0;

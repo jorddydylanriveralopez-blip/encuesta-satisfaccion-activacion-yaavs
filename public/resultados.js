@@ -649,57 +649,153 @@
     return items.find((r) => r.id === id);
   }
 
+  function responseDetailRows(r) {
+    const sales = salesLine(r);
+    const salesTotal = Number(r.ventasTotal) || 0;
+    const rows = [];
+    if (sales || salesTotal) {
+      rows.push({
+        label: "Ventas BTL",
+        value: `${sales || salesTotal}${salesTotal ? ` · Total ${salesTotal}` : ""}`,
+      });
+    }
+    Object.keys(LABELS).forEach((key) => {
+      const val = r[key];
+      if (val == null || String(val).trim() === "") return;
+      if (
+        [
+          "ventasTipos",
+          "ventasEsim",
+          "ventasSim",
+          "ventasPortabilidad",
+          "ventasDescargas",
+          "ventasTotal",
+        ].includes(key)
+      ) {
+        return;
+      }
+      rows.push({ label: LABELS[key], value: String(val) });
+    });
+    return rows;
+  }
+
   function openModal(id) {
     const r = findById(id);
     if (!r) return;
-    const lvl = level(r.experiencia);
+    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
     modalHero.innerHTML = `
       <span class="badge ${lvl.cls}">${lvl.label}</span>
       <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
-      <p>${formatDate(r.receivedAt || r.timestamp)} · ${escapeHtml(
-        r.satisfaccion || ""
+      <p>${formatDate(r.fecha || r.receivedAt || r.timestamp)} · ${escapeHtml(
+        r.satisfaccion || r.recomienda || ""
       )}</p>
     `;
-    const sales = salesLine(r);
-    const salesTotal = Number(r.ventasTotal) || 0;
-    modalBody.innerHTML =
-      (sales || salesTotal
-        ? `<div class="modal-row"><b>Ventas BTL</b><span>${escapeHtml(
-            sales || `${salesTotal}`
-          )}${salesTotal ? ` · Total ${salesTotal}` : ""}</span></div>`
-        : "") +
-      Object.keys(LABELS)
-        .map((key) => {
-          const val = r[key];
-          if (val == null || String(val).trim() === "") return "";
-          if (
-            [
-              "ventasTipos",
-              "ventasEsim",
-              "ventasSim",
-              "ventasPortabilidad",
-              "ventasDescargas",
-              "ventasTotal",
-            ].includes(key)
-          ) {
-            return "";
-          }
-          return `<div class="modal-row"><b>${LABELS[key]}</b><span>${escapeHtml(val)}</span></div>`;
-        })
-        .join("");
+    modalBody.innerHTML = responseDetailRows(r)
+      .map(
+        (row) =>
+          `<div class="modal-row"><b>${escapeHtml(row.label)}</b><span>${escapeHtml(
+            row.value
+          )}</span></div>`
+      )
+      .join("");
     modalActions.innerHTML =
       viewMode === "trash"
         ? `
       <button type="button" class="btn btn-solid-dark" data-restore="${escapeHtml(r.id)}">Restaurar</button>
       <button type="button" class="btn btn-danger" data-purge="${escapeHtml(r.id)}">Eliminar para siempre</button>
+      <button type="button" class="btn btn-soft" data-img="${escapeHtml(r.id)}">Descargar imagen</button>
     `
         : `
+      <button type="button" class="btn btn-soft" data-img="${escapeHtml(r.id)}">Descargar imagen</button>
       <button type="button" class="btn btn-soft" data-csv="${escapeHtml(r.id)}">CSV de esta respuesta</button>
       <button type="button" class="btn btn-danger" data-trash="${escapeHtml(r.id)}">Mover a papelera</button>
       <a class="btn btn-soft" href="./api/descargar-excel" data-excel>Excel completo</a>
     `;
     if (typeof modal.showModal === "function") modal.showModal();
     else modal.setAttribute("open", "");
+  }
+
+  async function downloadImage(id) {
+    const r = findById(id);
+    if (!r) return;
+    if (typeof html2canvas !== "function") {
+      window.alert("No se pudo cargar el generador de imagen. Recarga la página e intenta de nuevo.");
+      return;
+    }
+    const btn = [...modalActions.querySelectorAll("[data-img]")].find(
+      (el) => el.getAttribute("data-img") === id
+    );
+    const prev = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Generando…";
+    }
+    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
+    const rows = responseDetailRows(r);
+    const wrap = document.createElement("div");
+    wrap.className = "export-capture-host";
+    wrap.innerHTML = `
+      <div class="export-card" id="exportCard">
+        <div class="export-brand">
+          <img src="./assets/logo-yaavs-white.png" alt="YAAVS" width="92" height="92" />
+          <div>
+            <p class="export-kicker">Encuesta satisfacción · Activación</p>
+            <h2>Respuesta YAAVSER</h2>
+          </div>
+        </div>
+        <div class="export-hero">
+          <span class="badge ${lvl.cls}">${escapeHtml(lvl.label)}</span>
+          <h3>${escapeHtml(r.clave || "Sin clave")}</h3>
+          <p>${escapeHtml(formatDate(r.fecha || r.receivedAt || r.timestamp))}${
+            r.satisfaccion || r.recomienda
+              ? ` · ${escapeHtml(r.satisfaccion || r.recomienda)}`
+              : ""
+          }</p>
+        </div>
+        <div class="export-body">
+          ${rows
+            .map(
+              (row) => `
+            <div class="export-row">
+              <b>${escapeHtml(row.label)}</b>
+              <span>${escapeHtml(row.value)}</span>
+            </div>`
+            )
+            .join("")}
+        </div>
+        <p class="export-foot">YAAVS · ${escapeHtml(
+          formatDate(r.receivedAt || r.timestamp)
+        )} · ID ${escapeHtml(r.id || "")}</p>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    try {
+      const card = wrap.querySelector("#exportCard");
+      const canvas = await html2canvas(card, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Respuesta_${(r.clave || r.id || "encuesta")
+        .toString()
+        .replace(/[^\w\-]+/g, "_")
+        .slice(0, 40)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (_) {
+      window.alert("No se pudo generar la imagen. Intenta de nuevo.");
+    } finally {
+      wrap.remove();
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = prev || "Descargar imagen";
+      }
+    }
   }
 
   function downloadCsvOne(id) {
@@ -883,10 +979,12 @@
 
   modalActions.addEventListener("click", (e) => {
     const csvBtn = e.target.closest("[data-csv]");
+    const imgBtn = e.target.closest("[data-img]");
     const trashBtn = e.target.closest("[data-trash]");
     const restoreBtn = e.target.closest("[data-restore]");
     const purgeBtn = e.target.closest("[data-purge]");
     if (csvBtn) downloadCsvOne(csvBtn.getAttribute("data-csv"));
+    if (imgBtn) downloadImage(imgBtn.getAttribute("data-img"));
     if (trashBtn) moveToTrash(trashBtn.getAttribute("data-trash"));
     if (restoreBtn) restoreFromTrash(restoreBtn.getAttribute("data-restore"));
     if (purgeBtn) purgeForever(purgeBtn.getAttribute("data-purge"));
