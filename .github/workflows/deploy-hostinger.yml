@@ -48,7 +48,7 @@ jobs:
         env:
           HOSTINGER_DOMAIN: ${{ secrets.HOSTINGER_DOMAIN }}
         run: |
-          DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
+          DOMAIN="${HOSTINGER_DOMAIN:-encuesta-satisfaccion-activacion.ganayaavs.com}"
           curl -fsS --connect-timeout 10 --max-time 25 "https://${DOMAIN}/api/responses?includeTrash=1" -o responses-live.json \
             || echo '{"responses":[]}' > responses-live.json
           python3 -c "import json; d=json.load(open('responses-live.json')); print('backed up', len(d.get('responses') or d.get('items') or []))"
@@ -68,7 +68,7 @@ jobs:
 
           const TOKEN = process.env.HOSTINGER_API_TOKEN;
           const USERNAME = process.env.HOSTINGER_USERNAME || 'u376360150';
-          const DOMAIN = process.env.HOSTINGER_DOMAIN || 'lawngreen-guanaco-656732.hostingersite.com';
+          const DOMAIN = process.env.HOSTINGER_DOMAIN || 'encuesta-satisfaccion-activacion.ganayaavs.com';
           const ARCHIVE = process.env.ARCHIVE;
           const BASE = 'https://developers.hostinger.com';
           const headers = {
@@ -275,7 +275,7 @@ jobs:
           RESET_KEY: ${{ secrets.RESET_KEY }}
         run: |
           if [ ! -f responses-live.json ]; then echo "no backup file"; exit 0; fi
-          DOMAIN="${HOSTINGER_DOMAIN:-lawngreen-guanaco-656732.hostingersite.com}"
+          DOMAIN="${HOSTINGER_DOMAIN:-encuesta-satisfaccion-activacion.ganayaavs.com}"
           export HOSTINGER_DOMAIN="$DOMAIN"
           export RESET_KEY="${RESET_KEY:-yaavs-reset}"
           for i in $(seq 1 24); do
@@ -286,7 +286,7 @@ jobs:
           done
           python3 <<'PY'
           import json, os, time, urllib.request
-          domain = os.environ.get("HOSTINGER_DOMAIN") or "lawngreen-guanaco-656732.hostingersite.com"
+          domain = os.environ.get("HOSTINGER_DOMAIN") or "encuesta-satisfaccion-activacion.ganayaavs.com"
           key = os.environ.get("RESET_KEY") or "yaavs-reset"
           raw = json.load(open("responses-live.json"))
           items = raw.get("responses") or raw.get("items") or []

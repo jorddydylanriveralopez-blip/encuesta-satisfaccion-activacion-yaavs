@@ -4,8 +4,8 @@ Formulario web de la **Encuesta de Satisfacción 2.2**, con logo YAAVS y resulta
 
 ## En vivo (Hostinger)
 
-- Encuesta: https://lawngreen-guanaco-656732.hostingersite.com/
-- Resultados: https://lawngreen-guanaco-656732.hostingersite.com/resultados
+- Encuesta: https://encuesta-satisfaccion-activacion.ganayaavs.com/
+- Resultados: https://encuesta-satisfaccion-activacion.ganayaavs.com/resultados
 - Repo: https://github.com/jorddydylanriveralopez-blip/encuesta-satisfaccion-activacion-yaavs
 
 Las respuestas nuevas (v2.2) y las anteriores se guardan en el **mismo** portal de resultados. No se borra el historial.
