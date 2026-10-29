@@ -41,18 +41,6 @@
       required: true,
     },
     {
-      id: "ventasDia",
-      type: "scaleGroup",
-      title: "En un día normal, aproximadamente ¿cuántos servicios vendes en tu punto de venta?",
-      hint: "Califica de 1 a 5 cada servicio (1 = muy poco, 5 = mucho).",
-      items: [
-        { key: "ventasDiaChips", label: "Chips / Líneas nuevas" },
-        { key: "ventasDiaPortabilidad", label: "Portabilidades" },
-        { key: "ventasDiaEsim", label: "eSIM" },
-        { key: "ventasDiaPospago", label: "Pospago" },
-      ],
-    },
-    {
       id: "ayudaVisitas",
       type: "scaleWhy",
       title:
