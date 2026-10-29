@@ -73,7 +73,7 @@
       id: "productosMasVentas",
       type: "sales",
       title: "¿Qué productos o servicios se obtuvo más ventas durante la activación?",
-      hint: "Elige los que aplican y anota la cantidad (máximo 25). Si eliges Otro, especifica.",
+      hint: "Elige los que aplican y anota la cantidad (0 a 25). Puedes poner 0 si ese día no hubo ventas. Si eliges Otro, especifica.",
       options: [
         { label: "Línea nueva", qtyKey: "ventasActLineaNueva" },
         { label: "Portabilidad", qtyKey: "ventasActPortabilidad" },
@@ -164,7 +164,7 @@
   function clampQty(raw) {
     const n = Number(raw);
     if (!Number.isFinite(n)) return "";
-    return Math.max(1, Math.min(25, Math.round(n)));
+    return Math.max(0, Math.min(25, Math.round(n)));
   }
 
   function isQuestionValid(step) {
@@ -192,7 +192,7 @@
       return step.options.every((opt) => {
         if (!selected.includes(opt.label)) return true;
         const n = Number(state.answers[opt.qtyKey]);
-        const qtyOk = Number.isInteger(n) && n >= 1 && n <= 25;
+        const qtyOk = Number.isInteger(n) && n >= 0 && n <= 25;
         if (!qtyOk) return false;
         if (opt.otherTextKey) {
           return String(state.answers[opt.otherTextKey] || "").trim().length > 0;
@@ -238,7 +238,9 @@
       if (opt?.otherTextKey) delete state.answers[opt.otherTextKey];
     } else {
       selected.push(label);
-      if (!state.answers[qtyKey]) state.answers[qtyKey] = 1;
+      if (state.answers[qtyKey] == null || state.answers[qtyKey] === "") {
+        state.answers[qtyKey] = 0;
+      }
     }
     state.answers.productosMasVentas = selected;
     state.invalidIds.delete("productosMasVentas");
@@ -246,7 +248,8 @@
   }
 
   function bumpQty(qtyKey, delta) {
-    const current = Number(state.answers[qtyKey]) || 1;
+    const raw = Number(state.answers[qtyKey]);
+    const current = Number.isFinite(raw) ? raw : 0;
     state.answers[qtyKey] = clampQty(current + delta);
     state.invalidIds.delete("productosMasVentas");
     render({ preserveScroll: true });
@@ -468,13 +471,13 @@
                             opt.qtyKey
                           }" aria-label="Menos">−</button>
                           <input id="qty-${opt.qtyKey}" data-qty="${opt.qtyKey}" type="number"
-                            inputmode="numeric" min="1" max="25" step="1"
-                            value="${escapeHtml(qty)}" placeholder="1–25" />
+                            inputmode="numeric" min="0" max="25" step="1"
+                            value="${escapeHtml(qty)}" placeholder="0–25" />
                           <button type="button" class="qty-btn" data-qty-step="1" data-qty-key="${
                             opt.qtyKey
                           }" aria-label="Más">+</button>
                         </div>
-                        <span class="qty-cap">Máximo 25</span>
+                        <span class="qty-cap">De 0 a 25</span>
                         ${
                           opt.otherTextKey
                             ? `<label for="other-${opt.otherTextKey}">Especifica Otro</label>
@@ -654,7 +657,7 @@
       } else {
         const n = Number(raw);
         if (Number.isFinite(n)) {
-          const clamped = Math.max(1, Math.min(25, Math.round(n)));
+          const clamped = Math.max(0, Math.min(25, Math.round(n)));
           state.answers[key] = clamped;
           if (String(clamped) !== raw) t.value = String(clamped);
         }
