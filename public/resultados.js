@@ -26,11 +26,13 @@
   let view = "grid";
   let lastSync = null;
   let optionsFilled = false;
+  // v2.2 + legacy v1 keys (se suman si existen ambos)
   const SALES_PRODUCTS = [
-    { key: "ventasEsim", label: "eSIM" },
-    { key: "ventasSim", label: "SIM" },
-    { key: "ventasPortabilidad", label: "Portabilidad" },
-    { key: "ventasDescargas", label: "Descargas nuevas" },
+    { keys: ["ventasActEsim", "ventasEsim"], label: "eSIM" },
+    { keys: ["ventasActLineaNueva", "ventasSim"], label: "Línea nueva / SIM" },
+    { keys: ["ventasActPortabilidad", "ventasPortabilidad"], label: "Portabilidad" },
+    { keys: ["ventasActPospago", "ventasDescargas"], label: "Pospago / Descargas" },
+    { keys: ["ventasActOtroQty"], label: "Otro" },
   ];
 
   let lastSalesKey = "";
@@ -177,8 +179,41 @@
     dateHint.textContent = `Mostrando del ${a} al ${b}.`;
   }
 
-  function avg(list, key) {
-    const nums = list.map((r) => Number(r[key])).filter((n) => Number.isFinite(n) && n > 0);
+  function saleQty(r, keys) {
+    return (keys || []).reduce((sum, key) => sum + (Number(r[key]) || 0), 0);
+  }
+
+  function responseSalesTotal(r) {
+    const fromProducts = SALES_PRODUCTS.reduce((sum, p) => sum + saleQty(r, p.keys), 0);
+    if (fromProducts > 0) return fromProducts;
+    return Number(r.ventasTotal) || 0;
+  }
+
+  /** Satisfacción: v1 textual o ejecución v2.2 */
+  function satisfaccionOf(r) {
+    return String(r.satisfaccion || r.ejecucion || "").trim();
+  }
+
+  /** Experiencia 1–5: v1 o preferencia / imagen v2.2 */
+  function experienciaOf(r) {
+    const n = Number(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras || "");
+    return Number.isFinite(n) && n > 0 ? String(Math.round(n)) : "";
+  }
+
+  /** Atención / imagen 1–5 */
+  function atencionOf(r) {
+    const n = Number(r.atencion || r.imagenPromotoras || r.ayudaVisitas || "");
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function avgFrom(list, getter) {
+    const nums = list
+      .map((r) => {
+        const v = getter(r);
+        const n = typeof v === "number" ? v : Number(v);
+        return n;
+      })
+      .filter((n) => Number.isFinite(n) && n > 0);
     if (!nums.length) return "—";
     return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
   }
@@ -194,10 +229,10 @@
     if (optionsFilled) return;
     const set = new Set();
     list.forEach((r) => {
-      const v = String(r.satisfaccion || "").trim();
+      const v = satisfaccionOf(r);
       if (v) set.add(v);
     });
-    [...set].sort().forEach((v) => {
+    [...set].sort((a, b) => a.localeCompare(b, "es")).forEach((v) => {
       const opt = document.createElement("option");
       opt.value = v;
       opt.textContent = v;
@@ -215,9 +250,9 @@
     const hasta = dayKeyFromValue(hastaEl.value);
 
     let list = items.filter((r) => {
-      if (sat && r.satisfaccion !== sat) return false;
+      if (sat && satisfaccionOf(r) !== sat) return false;
       if (rec && r.recomienda !== rec) return false;
-      if (exp && String(r.experiencia) !== exp) return false;
+      if (exp && experienciaOf(r) !== exp) return false;
       const day = responseDayKey(r);
       if (desde && (!day || day < desde)) return false;
       if (hasta && (!day || day > hasta)) return false;
@@ -226,7 +261,7 @@
           r.clave,
           r.nombre,
           r.municipio,
-          r.satisfaccion,
+          satisfaccionOf(r),
           r.gusto,
           r.gustoOtro,
           r.expectativas,
@@ -235,6 +270,9 @@
           r.mejoras,
           r.comentarios,
           r.ventasTipos,
+          r.ejecucion,
+          r.ayudaVisitasPorque,
+          r.imagenPromotorasPorque,
           r.id,
         ]
           .join(" ")
@@ -251,7 +289,9 @@
       const ta = parseDate(a.receivedAt || a.timestamp)?.getTime() || 0;
       const tb = parseDate(b.receivedAt || b.timestamp)?.getTime() || 0;
       if (orden === "fecha-asc") return da.localeCompare(db) || ta - tb;
-      if (orden === "exp-desc") return Number(b.experiencia || 0) - Number(a.experiencia || 0);
+      if (orden === "exp-desc") {
+        return Number(experienciaOf(b) || 0) - Number(experienciaOf(a) || 0);
+      }
       if (orden === "clave-asc") {
         return String(a.clave || "").localeCompare(String(b.clave || ""), "es");
       }
@@ -263,11 +303,11 @@
 
   function renderMetrics(list) {
     const recommendYes = list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length;
-    const ventas = list.reduce((acc, r) => acc + (Number(r.ventasTotal) || 0), 0);
+    const ventas = list.reduce((acc, r) => acc + responseSalesTotal(r), 0);
     metricsEl.innerHTML = `
       <div class="metric"><span>Total</span><strong>${list.length}</strong></div>
-      <div class="metric"><span>Exp. promedio</span><strong>${avg(list, "experiencia")}</strong></div>
-      <div class="metric"><span>Atención</span><strong>${avg(list, "atencion")}</strong></div>
+      <div class="metric"><span>Exp. promedio</span><strong>${avgFrom(list, experienciaOf)}</strong></div>
+      <div class="metric"><span>Imagen / atención</span><strong>${avgFrom(list, atencionOf)}</strong></div>
       <div class="metric"><span>Recomiendan</span><strong>${recommendYes}</strong></div>
       <div class="metric"><span>Ventas BTL</span><strong>${ventas}</strong></div>
       <div class="metric metric-time"><span>Última sync</span><strong>${
@@ -276,10 +316,10 @@
     `;
   }
 
-  function tally(list, key, order) {
+  function tallyWith(list, getter, order) {
     const map = new Map();
     list.forEach((r) => {
-      const v = String(r[key] || "").trim();
+      const v = String(getter(r) || "").trim();
       if (!v) return;
       map.set(v, (map.get(v) || 0) + 1);
     });
@@ -415,6 +455,11 @@
 
   function renderCharts(list) {
     const satOrder = [
+      "Excelente",
+      "Buena",
+      "Regular",
+      "Deficiente",
+      "Muy deficiente",
       "Muy satisfecho(a)",
       "Satisfecho(a)",
       "Neutral",
@@ -424,18 +469,15 @@
     const recOrder = ["Sí", "Tal vez", "No"];
     const expOrder = ["5", "4", "3", "2", "1"];
 
-    const sat = tally(list, "satisfaccion", satOrder);
-    const rec = tally(list, "recomienda", recOrder);
-    const exp = tally(list, "experiencia", expOrder);
+    const sat = tallyWith(list, satisfaccionOf, satOrder);
+    const rec = tallyWith(list, (r) => r.recomienda, recOrder);
+    const exp = tallyWith(list, experienciaOf, expOrder);
     exp.labels = exp.labels.map((n) => `${n}/5`);
     const ventas = {
-      labels: ["eSIM", "SIM", "Portabilidad", "Descargas nuevas"],
-      values: [
-        list.reduce((a, r) => a + (Number(r.ventasEsim) || 0), 0),
-        list.reduce((a, r) => a + (Number(r.ventasSim) || 0), 0),
-        list.reduce((a, r) => a + (Number(r.ventasPortabilidad) || 0), 0),
-        list.reduce((a, r) => a + (Number(r.ventasDescargas) || 0), 0),
-      ],
+      labels: SALES_PRODUCTS.map((p) => p.label),
+      values: SALES_PRODUCTS.map((p) =>
+        list.reduce((a, r) => a + saleQty(r, p.keys), 0)
+      ),
     };
 
     const chartsKey = JSON.stringify({ sat, rec, exp, ventas });
@@ -453,11 +495,11 @@
       let vendidas = 0;
       let encuestas = 0;
       list.forEach((r) => {
-        const n = Number(r[p.key]) || 0;
+        const n = saleQty(r, p.keys);
         vendidas += n;
         if (n > 0) encuestas += 1;
       });
-      return { ...p, vendidas, encuestas };
+      return { label: p.label, keys: p.keys, vendidas, encuestas };
     });
     const total = rows.reduce((acc, row) => acc + row.vendidas, 0);
     return { rows, total };
@@ -465,7 +507,7 @@
 
   function salesLine(r) {
     return SALES_PRODUCTS.map((p) => {
-      const n = Number(r[p.key]) || 0;
+      const n = saleQty(r, p.keys);
       return n > 0 ? `${p.label} ${n}` : "";
     })
       .filter(Boolean)
@@ -505,12 +547,15 @@
       <tr>
         <td>Total</td>
         <td class="num">${data.total}</td>
-        <td class="num">${list.filter((r) => (Number(r.ventasTotal) || 0) > 0).length}</td>
+        <td class="num">${list.filter((r) => responseSalesTotal(r) > 0).length}</td>
       </tr>`;
   }
 
   function cardHtml(r, i) {
-    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
+    const expScore = experienciaOf(r);
+    const satLabel = satisfaccionOf(r);
+    const attn = atencionOf(r);
+    const lvl = level(expScore || r.imagenPromotoras);
     const animClass = animateCards ? "item item-enter" : "item";
     const delay = animateCards ? Math.min(i * 0.04, 0.35) : 0;
     const dayLabel = formatDate(r.fecha || r.receivedAt || r.timestamp);
@@ -534,17 +579,21 @@
             <div class="badge-stack">
               <span class="badge ${lvl.cls}">${lvl.label}</span>
             </div>
-            <span class="item-stars">${escapeHtml(r.experiencia || r.preferenciaYaavs || "—")}/5</span>
+            <span class="item-stars">${escapeHtml(expScore || "—")}/5</span>
           </div>
           <div class="item-body">
             <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
-            <p class="item-line">${escapeHtml(r.satisfaccion || r.recomienda || "—")} · ${escapeHtml(
+            <p class="item-line">${escapeHtml(satLabel || r.recomienda || "—")} · ${escapeHtml(
               r.gusto || r.municipio || "—"
             )}</p>
             <p class="item-meta">${escapeHtml(r.recomienda ? `Recomienda: ${r.recomienda}` : "")}${
-              r.atencion ? ` · Atención ${r.atencion}/5` : ""
+              attn ? ` · Imagen ${attn}/5` : ""
             }${
-              salesLine(r) ? ` · ${salesLine(r)}` : r.ventasTotal ? ` · Ventas ${r.ventasTotal}` : ""
+              salesLine(r)
+                ? ` · ${salesLine(r)}`
+                : responseSalesTotal(r)
+                  ? ` · Ventas ${responseSalesTotal(r)}`
+                  : ""
             }${
               viewMode === "trash" && r.deletedAt
                 ? ` · En papelera desde ${formatDate(r.deletedAt)}`
@@ -570,8 +619,8 @@
     const sales = salesSummary(list);
     return [
       list.length,
-      avg(list, "experiencia"),
-      avg(list, "atencion"),
+      avgFrom(list, experienciaOf),
+      avgFrom(list, atencionOf),
       list.filter((r) => String(r.recomienda).toLowerCase() === "sí").length,
       sales.total,
       sales.rows.map((r) => r.vendidas).join(","),
@@ -682,12 +731,12 @@
   function openModal(id) {
     const r = findById(id);
     if (!r) return;
-    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
+    const lvl = level(experienciaOf(r) || r.imagenPromotoras);
     modalHero.innerHTML = `
       <span class="badge ${lvl.cls}">${lvl.label}</span>
       <h2>${escapeHtml(r.clave || "Sin clave")}</h2>
       <p>${formatDate(r.fecha || r.receivedAt || r.timestamp)} · ${escapeHtml(
-        r.satisfaccion || r.recomienda || ""
+        satisfaccionOf(r) || r.recomienda || ""
       )}</p>
     `;
     modalBody.innerHTML = responseDetailRows(r)
@@ -730,7 +779,7 @@
       btn.disabled = true;
       btn.textContent = "Generando…";
     }
-    const lvl = level(r.experiencia || r.preferenciaYaavs || r.imagenPromotoras);
+    const lvl = level(experienciaOf(r) || r.imagenPromotoras);
     const rows = responseDetailRows(r);
     const wrap = document.createElement("div");
     wrap.className = "export-capture-host";
@@ -747,8 +796,8 @@
           <span class="badge ${lvl.cls}">${escapeHtml(lvl.label)}</span>
           <h3>${escapeHtml(r.clave || "Sin clave")}</h3>
           <p>${escapeHtml(formatDate(r.fecha || r.receivedAt || r.timestamp))}${
-            r.satisfaccion || r.recomienda
-              ? ` · ${escapeHtml(r.satisfaccion || r.recomienda)}`
+            satisfaccionOf(r) || r.recomienda
+              ? ` · ${escapeHtml(satisfaccionOf(r) || r.recomienda)}`
               : ""
           }</p>
         </div>
