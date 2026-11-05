@@ -175,7 +175,15 @@ function isTrashed(entry) {
 }
 
 function flatten(entry) {
-  const a = entry.answers && typeof entry.answers === "object" ? entry.answers : {};
+  const nested =
+    entry && entry.answers && typeof entry.answers === "object" ? entry.answers : null;
+  // Soporta filas anidadas (submit) y planas (API / import histórico)
+  const a =
+    nested && Object.keys(nested).length
+      ? nested
+      : entry && typeof entry === "object"
+        ? entry
+        : {};
   const out = {
     id: entry.id || "",
     receivedAt: entry.receivedAt || entry.timestamp || "",
@@ -244,12 +252,41 @@ async function forwardToSheets(entry) {
   if (!SHEETS_WEBHOOK_URL) return { skipped: true };
   try {
     const flat = flatten(entry);
-    const res = await fetch(SHEETS_WEBHOOK_URL, {
+    const payload = JSON.stringify({
+      ...flat,
+      destino: "encuesta-satisfaccion",
+      answers: entry.answers,
+    });
+    // Apps Script ejecuta doPost en el 1er hop y responde 302.
+    let res = await fetch(SHEETS_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...flat, answers: entry.answers }),
+      body: payload,
+      redirect: "manual",
     });
-    return { ok: res.ok, status: res.status };
+    let text = "";
+    let status = res.status;
+    if (status >= 300 && status < 400) {
+      const loc = res.headers.get("location");
+      if (loc) {
+        const follow = await fetch(loc, { method: "GET", redirect: "follow" });
+        text = await follow.text().catch(() => "");
+        status = follow.ok ? 200 : follow.status;
+      } else {
+        status = 200;
+      }
+    } else {
+      text = await res.text().catch(() => "");
+    }
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch (_) {
+      body = text ? { raw: String(text).slice(0, 200) } : null;
+    }
+    const ok = status >= 200 && status < 300 && (!body || body.ok !== false);
+    if (!ok) console.error("Sheets webhook HTTP", status, String(text).slice(0, 300));
+    return { ok, status, body };
   } catch (err) {
     console.error("Sheets webhook error:", err.message);
     return { ok: false, error: err.message };
@@ -729,6 +766,39 @@ app.post("/api/import", (req, res) => {
     res.json({ ok: true, count: list.length, imported: normalized.length, mode });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message || "No se pudo importar" });
+  }
+});
+
+/** Empuja respuestas existentes al Sheet (backup). */
+app.post("/api/sheets/sync", async (req, res) => {
+  try {
+    const key = String(req.body?.key || req.query?.key || "").trim();
+    const expected = String(process.env.RESET_KEY || "yaavs-reset").trim();
+    if (!key || key !== expected) {
+      return res.status(403).json({ ok: false, error: "No autorizado" });
+    }
+    if (!SHEETS_WEBHOOK_URL) {
+      return res.status(400).json({ ok: false, error: "SHEETS_WEBHOOK_URL no configurado" });
+    }
+    const onlyActive = String(req.body?.onlyActive || "1") !== "0";
+    const all = readResponses();
+    const list = onlyActive ? all.filter((r) => !isTrashed(r)) : all;
+    let ok = 0;
+    let fail = 0;
+    for (const entry of list) {
+      const result = await forwardToSheets(entry);
+      if (result && result.ok) ok += 1;
+      else fail += 1;
+    }
+    res.json({
+      ok: true,
+      total: list.length,
+      synced: ok,
+      failed: fail,
+      sheetsConfigured: true,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message || "No se pudo sincronizar" });
   }
 });
 
